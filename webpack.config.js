@@ -13,34 +13,47 @@
 
 const webpack = require("webpack");
 const path = require("path");
-const HtmlWebpackPlugin = require('html-webpack-plugin');
-const { CleanWebpackPlugin } = require('clean-webpack-plugin');
+const HtmlWebpackPlugin = require("html-webpack-plugin");
+const { CleanWebpackPlugin } = require("clean-webpack-plugin");
 
 module.exports = {
   context: path.resolve(__dirname, "."),
   entry: "./src/index.js",
   output: {
     path: path.resolve(__dirname, "dist"),
-    filename: "bundle.js"
+    filename: '[name].[contenthash:8].js',
   },
   plugins: [
     new CleanWebpackPlugin(),
-     new HtmlWebpackPlugin({
-       title: 'Output Management',
-     }),
-   ],  
+    new HtmlWebpackPlugin({
+      title: "Output Management",
+    }),
+  ],
+  optimization: {
+    runtimeChunk: 'single',
+     splitChunks: {
+       cacheGroups: {
+         vendor: {
+           test: /[\\/]node_modules[\\/]/,
+           name: 'vendors',
+           chunks: 'all',
+         },
+       },
+     },
+  },
   module: {
     rules: [
       // wasm files should not be processed but just be emitted and we want
       // to have their public URL.
       {
-        test: /rubiks\.wasm$/,
+        test: /\.wasm$/,
         type: "javascript/auto",
         loader: "file-loader",
-      }
-    ]
+      },
+      { test: /\.css$/, use: ["style-loader", "css-loader"] },
+    ],
   },
   devServer: {
-    contentBase: path.join(__dirname, 'dist')
-  }
+    contentBase: path.join(__dirname, "dist"),
+  },
 };
