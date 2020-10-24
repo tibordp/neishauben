@@ -2,29 +2,55 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
-#include <time.h> 
+#include <time.h>
+#include <emscripten.h>
 
 typedef struct var
 {
 	char sides[6][9];
 	char system;
-	char topology; // 0-OK, 1-wrong constitutionwrong colors,
-} cube;			   //  2-wrong edges, 3-wrong corners
+	//  0-OK, 1-wrong constitution wrong colors,
+	//  2-wrong edges, 3-wrong corners
+	char topology;
+} cube;
 
 // TOP-right    RIGHT-bottom  BOTTOM-left   LEFT-top
-char cube_transform[6][4][4] = {{{2, 5, 2, 2}, {5, 3, 2, 0}, {3, 4, 0, 2}, {4, 2, 2, 2}},
-								/*TRANSFORMATIONS FOR       */ {{3, 5, 2, 0}, {5, 2, 0, 0}, {2, 4, 0, 0}, {4, 3, 0, 2}},
-								/*  D   0..5 = F,B,U,D,L,R  */ {{1, 5, 2, 3}, {5, 0, 3, 0}, {0, 4, 0, 1}, {4, 1, 1, 2}},
-								/*  B   0..3 = top, right,  */ {{0, 5, 2, 1}, {5, 1, 1, 0}, {1, 4, 0, 3}, {4, 0, 3, 2}},
-								/* LUR         bottom, left */ {{1, 2, 3, 3}, {2, 0, 3, 3}, {0, 3, 3, 3}, {3, 1, 3, 3}},
-								/*  F  layout               */ {{1, 3, 1, 1}, {3, 0, 1, 1}, {0, 2, 1, 1}, {2, 1, 1, 1}}};
+/*
+ TRANSFORMATIONS FOR       
+  D   0..5 = F,B,U,D,L,R  
+  B   0..3 = top, right,  
+ LUR         bottom, left 
+  F  layout               
+*/
+char cube_transform[6][4][4] = {
+	{{2, 5, 2, 2}, {5, 3, 2, 0}, {3, 4, 0, 2}, {4, 2, 2, 2}},
+	{{3, 5, 2, 0}, {5, 2, 0, 0}, {2, 4, 0, 0}, {4, 3, 0, 2}},
+	{{1, 5, 2, 3}, {5, 0, 3, 0}, {0, 4, 0, 1}, {4, 1, 1, 2}},
+	{{0, 5, 2, 1}, {5, 1, 1, 0}, {1, 4, 0, 3}, {4, 0, 3, 2}},
+	{{1, 2, 3, 3}, {2, 0, 3, 3}, {0, 3, 3, 3}, {3, 1, 3, 3}},
+	{{1, 3, 1, 1}, {3, 0, 1, 1}, {0, 2, 1, 1}, {2, 1, 1, 1}}};
 
 char halfturn_transform[6][2][4];
 char directions_transform[6][6];
 char double_directions_transform[6][6][6];
 
 char edge_transform[4] = {1, 5, 7, 3}; //TOP, RIGHT, BOTTOM, LEFT
-char corner_transform[4][4] = {{-1, 2, -1, 0}, {2, -1, 8, -1}, {-1, 8, -1, 6}, {0, -1, 6, -1}};
+char corner_transform[4][4] = {
+	{-1, 2, -1, 0},
+	{2, -1, 8, -1},
+	{-1, 8, -1, 6},
+	{0, -1, 6, -1}};
+
+char sp_case_sides[8][4][2] = {
+	{{0, 0}, {0, 0}, {0, 0}, {0, 0}},
+	{{0, 0}, {0, 0}, {1, 1}, {0, 0}},
+	{{0, 0}, {0, 1}, {0, 0}, {1, 0}},
+	{{0, 0}, {1, 1}, {0, 0}, {1, 1}},
+	{{1, 1}, {0, 1}, {0, 0}, {1, 0}},
+	{{1, 0}, {0, 1}, {0, 0}, {0, 0}},
+	{{0, 1}, {0, 0}, {0, 1}, {0, 1}},
+	{{1, 0}, {0, 0}, {1, 0}, {1, 0}}};
+char sp_corner_transform[4] = {0, 2, 8, 6};
 
 #define cube_inverse(x) (((x / 2) * 2) - (x % 2) + 1)
 #define DBG()                                                        \
@@ -168,7 +194,7 @@ void cube_perform_swap_middles(char *src, char *dst, int dir1, int dir2)
 void cube_perform_rotate(char *arry, int mode)
 {
 	/* 0: clockwise
-	1: counter-clokwise
+	1: counter-clockwise
 	2: double 
 	*/
 	int cnt;
@@ -373,155 +399,6 @@ void cube_perform(cube *src_c, int operation)
 		cube_perform_rotate_cube(src_c, (operation - 45) * 2);
 		cube_perform_rotate_cube(src_c, (operation - 45) * 2);
 	}
-}
-
-void cube_out(cube *source, int mode, int transform)
-{
-	cube *to_out;
-	if (transform < 0)
-	{
-		to_out = source;
-	}
-	else
-	{
-		to_out = (cube *)malloc(sizeof(cube));
-		*to_out = *source;
-		cube_perform(to_out, transform);
-	}
-	int cnt, cnt2, cntx;
-	char buf[9 * 6];
-	switch (mode)
-	{
-	case 0:
-		fwrite(to_out, sizeof(cube), 1, stdout);
-		break;
-	case 1:
-		cntx = 0;
-		for (cnt = 0; cnt < 6; cnt++)
-		{
-			for (cnt2 = 0; cnt2 < 9; cnt2++)
-			{
-				buf[cntx] = (*to_out).sides[cnt][cnt2] + 0x30;
-				cntx++;
-			}
-		}
-		fwrite(buf, sizeof(char), 9 * 6, stdout);
-		break;
-	case 2:
-		for (cntx = 0; cntx < 3; cntx++)
-		{
-			printf("      ");
-			for (cnt = 0; cnt < 3; cnt++)
-			{
-				printf("%d ", (*to_out).sides[3][cntx * 3 + cnt]);
-			}
-			printf("\n");
-		}
-		for (cntx = 0; cntx < 3; cntx++)
-		{
-			printf("      ");
-			for (cnt = 0; cnt < 3; cnt++)
-			{
-				printf("%d ", (*to_out).sides[1][cntx * 3 + cnt]);
-			}
-			printf("\n");
-		}
-		for (cntx = 0; cntx < 3; cntx++)
-		{
-			for (cnt = 0; cnt < 3; cnt++)
-			{
-				printf("%d ", (*to_out).sides[4][cntx * 3 + cnt]);
-			}
-			for (cnt = 0; cnt < 3; cnt++)
-			{
-				printf("%d ", (*to_out).sides[2][cntx * 3 + cnt]);
-			}
-			for (cnt = 0; cnt < 3; cnt++)
-			{
-				printf("%d ", (*to_out).sides[5][cntx * 3 + cnt]);
-			}
-			printf("\n");
-		}
-		for (cntx = 0; cntx < 3; cntx++)
-		{
-			printf("      ");
-			for (cnt = 0; cnt < 3; cnt++)
-			{
-				printf("%d ", (*to_out).sides[0][cntx * 3 + cnt]);
-			}
-			printf("\n");
-		}
-		break;
-	}
-	if (transform > 0)
-	{
-		free(to_out);
-	}
-}
-
-void cube_perform_alg(cube *source, int *alg, int track)
-{
-	int cnt = 0;
-	while (alg[cnt] != -1)
-	{
-		cube_perform(source, alg[cnt]);
-		if (track && (alg[cnt] > -1))
-		{
-			cube_out(source, 1, -1);
-			printf("\n");
-		}
-		cnt++;
-	}
-}
-
-void cube_print_algorithm(int *alg)
-{
-	int cnt = 0;
-	char dum[10];
-	char sides[6] = {'F', 'B', 'U', 'D', 'L', 'R'};
-	while (alg[cnt] != -1)
-	{
-		if (alg[cnt] == -2)
-		{
-			dum[0] = '|';
-			dum[1] = 0;
-		}
-		else if (alg[cnt] < 12)
-		{
-			dum[0] = sides[alg[cnt] / 2];
-			if (alg[cnt] % 2 == 1)
-			{
-				dum[1] = 0x27;
-				dum[2] = 0x00;
-			}
-			else
-			{
-				dum[1] = 0x00;
-			}
-		}
-		else if ((alg[cnt] > 11) & (alg[cnt] < 24))
-		{
-			dum[0] = sides[(alg[cnt] - 12) / 2] + 32;
-			if (alg[cnt] % 2 == 1)
-			{
-				dum[1] = 0x27;
-				dum[2] = 0x00;
-			}
-			else
-			{
-				dum[1] = 0x00;
-			}
-		}
-		else if ((alg[cnt] > 23) & (alg[cnt] < 30))
-		{
-			dum[0] = sides[alg[cnt] - 24];
-			dum[1] = '2';
-			dum[2] = 0x00;
-		}
-		printf("%s ", dum);
-		cnt++;
-	}
-	//printf("\n");
 }
 
 void cube_find_center(cube *source,
@@ -1382,17 +1259,17 @@ int cube_ll_cross(cube *source)
 int cube_ll_corners_align_relative_position(int base, int *corner)
 {
 	int cnt, cnt2;
-	int boo;
+	int flag;
 	for (cnt = 0; cnt < 4; cnt++)
 	{
-		boo = 1;
+		flag = 1;
 		for (cnt2 = 0; cnt2 < 3; cnt2++)
 		{
-			boo = boo & ((base == corner[cnt2]) |
-						 (cube_transform[base][cnt][0] == corner[cnt2]) |
-						 (cube_transform[base][cnt][1] == corner[cnt2]));
+			flag = flag && ((base == corner[cnt2]) ||
+							(cube_transform[base][cnt][0] == corner[cnt2]) ||
+							(cube_transform[base][cnt][1] == corner[cnt2]));
 		}
-		if (boo)
+		if (flag)
 		{
 			return cnt;
 		}
@@ -1402,18 +1279,18 @@ int cube_ll_corners_align_relative_position(int base, int *corner)
 int cube_ll_corners_align_check_corner(int *c_1, int *c_2)
 {
 	int cnt1, cnt2;
-	int boo = 0;
+	int flag = 0;
 	for (cnt1 = 0; cnt1 < 3; cnt1++)
 	{
 		for (cnt2 = 0; cnt2 < 3; cnt2++)
 		{
 			if (c_1[cnt1] == c_2[cnt2])
 			{
-				boo++;
+				flag++;
 			}
 		}
 	}
-	if (boo == 3)
+	if (flag == 3)
 	{
 		return 1;
 	}
@@ -1513,49 +1390,37 @@ int cube_ll_corners_align(cube *source)
 
 void cube_ll_corners_orient_scan_state(cube *source, int st_col, int *state, int *orientation)
 {
-	char sp_corner_transform[4] = {0, 2, 8, 6};
-	char case_sides[8][4][2] = {{{0, 0}, {0, 0}, {0, 0}, {0, 0}}, {{0, 0}, {0, 0}, {1, 1}, {0, 0}}, {{0, 0}, {0, 1}, {0, 0}, {1, 0}}, {{0, 0}, {1, 1}, {0, 0}, {1, 1}}, {{1, 1}, {0, 1}, {0, 0}, {1, 0}}, {{1, 0}, {0, 1}, {0, 0}, {0, 0}}, {{0, 1}, {0, 0}, {0, 1}, {0, 1}}, {{1, 0}, {0, 0}, {1, 0}, {1, 0}}};
-	int cnt0, cnt, cnt1, boo, c1, c2;
+	int cnt0, cnt, cnt1, flag, c1, c2;
 
 	for (cnt0 = 0; cnt0 < 8; cnt0++)
 	{
 		for (cnt = 0; cnt < 4; cnt++)
 		{
-			boo = 1;
+			flag = 1;
 			for (cnt1 = 0; cnt1 < 4; cnt1++)
 			{
-				if ((*source).sides[cube_transform[st_col][(cnt + cnt1) % 4][0]]
-								   [sp_corner_transform[cube_transform[st_col][(cnt + cnt1) % 4][2]]] == st_col)
-				{
-					c2 = 1;
-				}
-				else
-				{
-					c2 = 0;
-				}
-				if ((*source).sides[cube_transform[st_col][(cnt + cnt1) % 4][0]]
-								   [sp_corner_transform[(cube_transform[st_col][(cnt + cnt1) % 4][2] + 1) % 4]] == st_col)
-				{
-					c1 = 1;
-				}
-				else
-				{
-					c1 = 0;
-				}
-				boo = boo & (c1 == case_sides[cnt0][cnt1][0]) & (c2 == case_sides[cnt0][cnt1][1]);
+				c2 = ((*source).sides[cube_transform[st_col][(cnt + cnt1) % 4][0]]
+									 [sp_corner_transform[cube_transform[st_col][(cnt + cnt1) % 4][2]]] == st_col)
+						 ? 1
+						 : 0;
+				c1 = ((*source).sides[cube_transform[st_col][(cnt + cnt1) % 4][0]]
+									 [sp_corner_transform[(cube_transform[st_col][(cnt + cnt1) % 4][2] + 1) % 4]] == st_col)
+						 ? 1
+						 : 0;
+				flag = flag && (c1 == sp_case_sides[cnt0][cnt1][0]) && (c2 == sp_case_sides[cnt0][cnt1][1]);
 			}
-			if (boo)
+			if (flag)
 			{
 				break;
 			}
 		}
-		if (boo)
+		if (flag)
 		{
 			break;
 		}
 	}
 
-	if (!boo)
+	if (!flag)
 	{
 		return;
 	}
@@ -1849,6 +1714,155 @@ int cube_solve(cube *source, int **alg)
 	free(copy);
 }
 
+void cube_out(cube *source, int mode, int transform)
+{
+	cube *to_out;
+	if (transform < 0)
+	{
+		to_out = source;
+	}
+	else
+	{
+		to_out = (cube *)malloc(sizeof(cube));
+		*to_out = *source;
+		cube_perform(to_out, transform);
+	}
+	int cnt, cnt2, cntx;
+	char buf[9 * 6];
+	switch (mode)
+	{
+	case 0:
+		fwrite(to_out, sizeof(cube), 1, stdout);
+		break;
+	case 1:
+		cntx = 0;
+		for (cnt = 0; cnt < 6; cnt++)
+		{
+			for (cnt2 = 0; cnt2 < 9; cnt2++)
+			{
+				buf[cntx] = (*to_out).sides[cnt][cnt2] + 0x30;
+				cntx++;
+			}
+		}
+		fwrite(buf, sizeof(char), 9 * 6, stdout);
+		break;
+	case 2:
+		for (cntx = 0; cntx < 3; cntx++)
+		{
+			printf("      ");
+			for (cnt = 0; cnt < 3; cnt++)
+			{
+				printf("%d ", (*to_out).sides[3][cntx * 3 + cnt]);
+			}
+			printf("\n");
+		}
+		for (cntx = 0; cntx < 3; cntx++)
+		{
+			printf("      ");
+			for (cnt = 0; cnt < 3; cnt++)
+			{
+				printf("%d ", (*to_out).sides[1][cntx * 3 + cnt]);
+			}
+			printf("\n");
+		}
+		for (cntx = 0; cntx < 3; cntx++)
+		{
+			for (cnt = 0; cnt < 3; cnt++)
+			{
+				printf("%d ", (*to_out).sides[4][cntx * 3 + cnt]);
+			}
+			for (cnt = 0; cnt < 3; cnt++)
+			{
+				printf("%d ", (*to_out).sides[2][cntx * 3 + cnt]);
+			}
+			for (cnt = 0; cnt < 3; cnt++)
+			{
+				printf("%d ", (*to_out).sides[5][cntx * 3 + cnt]);
+			}
+			printf("\n");
+		}
+		for (cntx = 0; cntx < 3; cntx++)
+		{
+			printf("      ");
+			for (cnt = 0; cnt < 3; cnt++)
+			{
+				printf("%d ", (*to_out).sides[0][cntx * 3 + cnt]);
+			}
+			printf("\n");
+		}
+		break;
+	}
+	if (transform > 0)
+	{
+		free(to_out);
+	}
+}
+
+void cube_perform_alg(cube *source, int *alg, int track)
+{
+	int cnt = 0;
+	while (alg[cnt] != -1)
+	{
+		cube_perform(source, alg[cnt]);
+		if (track && (alg[cnt] > -1))
+		{
+			cube_out(source, 1, -1);
+			printf("\n");
+		}
+		cnt++;
+	}
+}
+
+void cube_print_algorithm(int *alg)
+{
+	int cnt = 0;
+	char dum[10];
+	char sides[6] = {'F', 'B', 'U', 'D', 'L', 'R'};
+	while (alg[cnt] != -1)
+	{
+		if (alg[cnt] == -2)
+		{
+			dum[0] = '|';
+			dum[1] = 0;
+		}
+		else if (alg[cnt] < 12)
+		{
+			dum[0] = sides[alg[cnt] / 2];
+			if (alg[cnt] % 2 == 1)
+			{
+				dum[1] = 0x27;
+				dum[2] = 0x00;
+			}
+			else
+			{
+				dum[1] = 0x00;
+			}
+		}
+		else if ((alg[cnt] > 11) & (alg[cnt] < 24))
+		{
+			dum[0] = sides[(alg[cnt] - 12) / 2] + 32;
+			if (alg[cnt] % 2 == 1)
+			{
+				dum[1] = 0x27;
+				dum[2] = 0x00;
+			}
+			else
+			{
+				dum[1] = 0x00;
+			}
+		}
+		else if ((alg[cnt] > 23) & (alg[cnt] < 30))
+		{
+			dum[0] = sides[alg[cnt] - 24];
+			dum[1] = '2';
+			dum[2] = 0x00;
+		}
+		printf("%s ", dum);
+		cnt++;
+	}
+	//printf("\n");
+}
+
 int cube_read(cube *temp)
 {
 	char buf[9];
@@ -1874,7 +1888,25 @@ int cube_read(cube *temp)
 	return 1;
 }
 
-int main(int argc, char *argv[])
+EMSCRIPTEN_KEEPALIVE
+char* run(char* command) {
+	srand(time(NULL));
+	cube c_main;
+	cube_init();
+
+	if (strcmp(command, "scramble")) {
+		int *alg = (int *)malloc(sizeof(int) * 23);
+		cube_default(&c_main);
+		cube_scramble(alg, 22);
+		cube_perform_alg(&c_main, alg, 0);
+		cube_print_algorithm(alg);
+		return "yay!";
+	}
+	return "foo";
+}
+
+EMSCRIPTEN_KEEPALIVE
+int foomain(int argc, char *argv[])
 {
 	srand(time(NULL));
 	cube c_main;

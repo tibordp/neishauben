@@ -1,0 +1,4 @@
+src/rubiks.wasm
+src/rubiks.js
+dist/
+node_modules/
