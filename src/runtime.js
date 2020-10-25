@@ -1,10 +1,10 @@
-import rubiks from './rubiks.js';
-import rubiksModule from './rubiks.wasm';
+import rubiks from "./rubiks.js";
+import rubiksModule from "./rubiks.wasm";
 
 export const createRuntime = async () => {
     const runtime = await rubiks({
         locateFile(path) {
-            if (path.endsWith('.wasm')) {
+            if (path.endsWith(".wasm")) {
                 return rubiksModule;
             }
             return path;
