@@ -3,7 +3,8 @@
 #include <string.h>
 #include <limits.h>
 #include <time.h>
-#include <emscripten.h>
+//#include <emscripten.h>
+#define EMSCRIPTEN_KEEPALIVE
 
 typedef struct var
 {
@@ -1906,7 +1907,7 @@ char* run(char* command) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-int foomain(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	srand(time(NULL));
 	cube c_main;

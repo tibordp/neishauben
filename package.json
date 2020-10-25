@@ -9,7 +9,7 @@
     "build": "npm run build:wasm && npm run build:bundle",
     "lint": "eslint src/",
     "lint:fix": "eslint --fix src/",
-    "dev": "webpack serve"
+    "dev": "webpack --mode=development serve"
   },
   "devDependencies": {
     "clean-webpack-plugin": "^3.0.0",
