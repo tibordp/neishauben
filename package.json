@@ -1,11 +1,11 @@
 {
-  "name": "rubiks",
+  "name": "neishauben",
   "license": "MIT",
   "private": true,
   "version": "0.0.1",
   "scripts": {
     "build:bundle": "webpack",
-    "build:wasm": "docker run --rm -v $(pwd):/src emscripten/emsdk emcc -O3 -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='[\"cwrap\"]' -s ALLOW_MEMORY_GROWTH=1 -s ENVIRONMENT=web -s MODULARIZE=1 -s 'EXPORT_NAME=\"rubiks\"' -o ./src/rubiks.js ./src/rubiks.c",
+    "build:wasm": "docker run --rm -v $(pwd):/src emscripten/emsdk emcc -O3 -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='[\"cwrap\",\"getValue\",\"setValue\",\"_malloc\"]' -s ALLOW_MEMORY_GROWTH=1 -s ENVIRONMENT=web -s MODULARIZE=1 -s 'EXPORT_NAME=\"rubiks\"' -o ./src/rubiks.js ./src/rubiks.c",
     "build": "npm run build:wasm && npm run build:bundle",
     "lint": "eslint src/",
     "lint:fix": "eslint --fix src/",

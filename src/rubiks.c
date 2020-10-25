@@ -3,8 +3,7 @@
 #include <string.h>
 #include <limits.h>
 #include <time.h>
-//#include <emscripten.h>
-#define EMSCRIPTEN_KEEPALIVE
+#include <emscripten.h>
 
 typedef struct var
 {
@@ -1715,103 +1714,17 @@ int cube_solve(cube *source, int **alg)
 	free(copy);
 }
 
-void cube_out(cube *source, int mode, int transform)
+int cube_out(cube *cube, char* cube_data)
 {
-	cube *to_out;
-	if (transform < 0)
+	int i, j;
+	for (i = 0; i < 6; i++)
 	{
-		to_out = source;
+		for (j = 0; j < 9; j++)
+		{
+			*(cube_data++) = (*cube).sides[i][j];
+		}
 	}
-	else
-	{
-		to_out = (cube *)malloc(sizeof(cube));
-		*to_out = *source;
-		cube_perform(to_out, transform);
-	}
-	int cnt, cnt2, cntx;
-	char buf[9 * 6];
-	switch (mode)
-	{
-	case 0:
-		fwrite(to_out, sizeof(cube), 1, stdout);
-		break;
-	case 1:
-		cntx = 0;
-		for (cnt = 0; cnt < 6; cnt++)
-		{
-			for (cnt2 = 0; cnt2 < 9; cnt2++)
-			{
-				buf[cntx] = (*to_out).sides[cnt][cnt2] + 0x30;
-				cntx++;
-			}
-		}
-		fwrite(buf, sizeof(char), 9 * 6, stdout);
-		break;
-	case 2:
-		for (cntx = 0; cntx < 3; cntx++)
-		{
-			printf("      ");
-			for (cnt = 0; cnt < 3; cnt++)
-			{
-				printf("%d ", (*to_out).sides[3][cntx * 3 + cnt]);
-			}
-			printf("\n");
-		}
-		for (cntx = 0; cntx < 3; cntx++)
-		{
-			printf("      ");
-			for (cnt = 0; cnt < 3; cnt++)
-			{
-				printf("%d ", (*to_out).sides[1][cntx * 3 + cnt]);
-			}
-			printf("\n");
-		}
-		for (cntx = 0; cntx < 3; cntx++)
-		{
-			for (cnt = 0; cnt < 3; cnt++)
-			{
-				printf("%d ", (*to_out).sides[4][cntx * 3 + cnt]);
-			}
-			for (cnt = 0; cnt < 3; cnt++)
-			{
-				printf("%d ", (*to_out).sides[2][cntx * 3 + cnt]);
-			}
-			for (cnt = 0; cnt < 3; cnt++)
-			{
-				printf("%d ", (*to_out).sides[5][cntx * 3 + cnt]);
-			}
-			printf("\n");
-		}
-		for (cntx = 0; cntx < 3; cntx++)
-		{
-			printf("      ");
-			for (cnt = 0; cnt < 3; cnt++)
-			{
-				printf("%d ", (*to_out).sides[0][cntx * 3 + cnt]);
-			}
-			printf("\n");
-		}
-		break;
-	}
-	if (transform > 0)
-	{
-		free(to_out);
-	}
-}
-
-void cube_perform_alg(cube *source, int *alg, int track)
-{
-	int cnt = 0;
-	while (alg[cnt] != -1)
-	{
-		cube_perform(source, alg[cnt]);
-		if (track && (alg[cnt] > -1))
-		{
-			cube_out(source, 1, -1);
-			printf("\n");
-		}
-		cnt++;
-	}
+	return 0;
 }
 
 void cube_print_algorithm(int *alg)
@@ -1864,46 +1777,38 @@ void cube_print_algorithm(int *alg)
 	//printf("\n");
 }
 
-int cube_read(cube *temp)
+int cube_read(cube *cube, char* cube_data)
 {
 	char buf[9];
 	int i, j;
 	for (i = 0; i < 6; i++)
 	{
-		if (fread(buf, sizeof(char), 9, stdin) != 9)
-		{
-			return 0;
-		}
 		for (j = 0; j < 9; j++)
 		{
-			if ((*(buf + j) > 0x2f) && (*(buf + j) < 0x3a))
-			{
-				(*temp).sides[i][j] = *(buf + j) - 0x30;
-			}
-			else
-			{
-				return 0;
-			}
+			(*cube).sides[i][j] = *(cube_data++);
 		}
 	}
-	return 1;
+	return 0;
 }
 
 EMSCRIPTEN_KEEPALIVE
-char* run(char* command) {
+int init() {
+	srand(time(NULL));
+	cube_init();
+	return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int perform(char* cube_data, int operation) {
 	srand(time(NULL));
 	cube c_main;
 	cube_init();
 
-	if (strcmp(command, "scramble")) {
-		int *alg = (int *)malloc(sizeof(int) * 23);
-		cube_default(&c_main);
-		cube_scramble(alg, 22);
-		cube_perform_alg(&c_main, alg, 0);
-		cube_print_algorithm(alg);
-		return "yay!";
-	}
-	return "foo";
+	cube_read(&c_main, cube_data);
+	cube_perform(&c_main, operation);
+	cube_out(&c_main, cube_data);
+
+	return 0;
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -1916,6 +1821,8 @@ int main(int argc, char *argv[])
 	{
 		return 1;
 	}
+
+	/*
 	if (strcmp(argv[1], "scramble_n") == 0)
 	{
 		int *alg = (int *)malloc(sizeof(int) * 23);
@@ -1964,6 +1871,6 @@ int main(int argc, char *argv[])
 	else
 	{
 	}
-	printf("\n");
+	*/
 	return 0;
 }
