@@ -1,2 +1,24 @@
-body { margin: 0; }
-canvas { display: block; outline: none; }
+canvas { 
+    display: block; 
+    outline: none; 
+}
+
+#top-bar, #bottom-bar {
+    padding: 5px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    text-align: center;
+}
+
+#top-bar {
+    top: 0;
+}
+
+#bottom-bar {
+    bottom: 0;
+}
+
+#top-bar *, #bottom-bar * {
+    margin: 5px;
+}

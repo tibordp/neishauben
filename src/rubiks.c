@@ -542,7 +542,8 @@ int cube_layer(cube *source, // default 2
 	}
 }
 
-void cube_scramble(int *alg, int depth)
+EMSCRIPTEN_KEEPALIVE
+void cube_scramble(char *alg, int depth)
 {
 	int cnt;
 	int dum, cur;
@@ -586,8 +587,7 @@ void cube_check_topology(cube *source)
 	}
 }
 
-int record_enabled = 0;
-int *record_algorithm;
+int record_algorithm[1024];
 int record_count = 0;
 
 int sp_perform(cube *ins, int oper)
@@ -597,12 +597,7 @@ int sp_perform(cube *ins, int oper)
 	if (oper != -1)
 	{
 		cube_perform(ins, oper);
-		if (record_enabled)
-		{
-			record_count++;
-			record_algorithm = (int *)realloc(record_algorithm, sizeof(int) * record_count);
-			record_algorithm[record_count - 1] = oper;
-		}
+		record_algorithm[record_count++] = oper;
 		c_dcount++;
 	}
 	else
@@ -1606,7 +1601,7 @@ void cube_optimize_algorithm_parse(int value, int *class, int *face)
 int *cube_optimize_algorithm(int *alg)
 {
 	int stack_pos = 0;
-	int *stack;
+	int stack[1024];
 
 	int count = 0;
 	int cnt, vll, v1, c1, v2, c2;
@@ -1614,7 +1609,6 @@ int *cube_optimize_algorithm(int *alg)
 	{
 		count++;
 	}
-	stack = (int *)malloc(count * sizeof(int));
 	for (cnt = 0; cnt < count; cnt++)
 	{
 		cube_optimize_algorithm_parse(alg[cnt], &c1, &v1);
@@ -1658,60 +1652,58 @@ int *cube_optimize_algorithm(int *alg)
 		cnt++;
 	}
 	alg[cnt] = -1;
-	free(stack);
 }
 
 void cube_recolor(cube *input)
 {
 	int i, j;
-	cube tmp = *input;
+	char replacements[6];
+	for (i = 0; i < 6; i++) {
+		replacements[(*input).sides[i][4]] = i;
+	}
+
 	for (i = 0; i < 6; i++)
 	{
 		for (j = 0; j < 9; j++)
 		{
-			(*input).sides[i][j] = tmp.sides[tmp.sides[i][j]][4];
+			(*input).sides[i][j] = replacements[(*input).sides[i][j]];
 		}
 	}
 }
 
-int cube_solve(cube *source, int **alg)
+void cube_solve(cube *source, int *alg)
 {
 	int min = INT_MAX;
 	int cnt, cnt2;
-	record_enabled = 1;
-	cube *copy = malloc(sizeof(cube));
+	cube copy;
+
 	for (cnt = 0; cnt < 6; cnt++)
 	{
 		record_count = 0;
-		*copy = *source;
-		(*copy).system = cnt;
-		cube_fl_cross(copy);
-		sp_perform(copy, -2);
-		cube_fl_corners(copy);
-		sp_perform(copy, -2);
-		cube_sl_solve(copy);
-		sp_perform(copy, -2);
-		cube_ll_cross(copy);
-		sp_perform(copy, -2);
-		cube_ll_corners_align(copy);
-		sp_perform(copy, -2);
-		cube_ll_corners_orient(copy);
-		sp_perform(copy, -2);
-		cube_ll_permute_edges(copy);
-		sp_perform(copy, -2);
+		copy = *source;
+		copy.system = cnt;
+
+		cube_fl_cross(&copy);
+		sp_perform(&copy, -2);
+		cube_fl_corners(&copy);
+		sp_perform(&copy, -2);
+		cube_sl_solve(&copy);
+		sp_perform(&copy, -2);
+		cube_ll_cross(&copy);
+		sp_perform(&copy, -2);
+		cube_ll_corners_align(&copy);
+		sp_perform(&copy, -2);
+		cube_ll_corners_orient(&copy);
+		sp_perform(&copy, -2);
+		cube_ll_permute_edges(&copy);
+		sp_perform(&copy, -2);
 		if (record_count < min)
 		{
-			*alg = (int *)realloc(*alg, sizeof(int) * (record_count + 1));
-			for (cnt2 = 0; cnt2 < record_count; cnt2++)
-			{
-				(*alg)[cnt2] = record_algorithm[cnt2];
-			}
-			(*alg)[record_count] = -1;
+			memcpy(alg, record_algorithm, sizeof(int) * record_count);
+			alg[record_count] = -1;
 			min = record_count;
 		}
 	}
-	free(record_algorithm);
-	free(copy);
 }
 
 int cube_out(cube *cube, char* cube_data)
@@ -1800,10 +1792,7 @@ int init() {
 
 EMSCRIPTEN_KEEPALIVE
 int perform(char* cube_data, int operation) {
-	srand(time(NULL));
 	cube c_main;
-	cube_init();
-
 	cube_read(&c_main, cube_data);
 	cube_perform(&c_main, operation);
 	cube_out(&c_main, cube_data);
@@ -1812,65 +1801,29 @@ int perform(char* cube_data, int operation) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-int main(int argc, char *argv[])
-{
-	srand(time(NULL));
+int recolor(char* cube_data) {
 	cube c_main;
-	cube_init();
-	if (argc < 2)
-	{
-		return 1;
+	cube_read(&c_main, cube_data);
+	cube_recolor(&c_main);
+	cube_out(&c_main, cube_data);
+
+	return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int solve(char* cube_data, char* out_alg) {
+	cube c_main;
+	int alg[1024];
+	cube_read(&c_main, cube_data);
+	cube_recolor(&c_main);
+	cube_solve(&c_main, alg);
+	cube_optimize_algorithm(alg);
+	for (int i = 0; i < 1024; ++i) {
+		out_alg[i] = alg[i];
+		if (alg[i] == -1) {
+			break;
+		}
 	}
 
-	/*
-	if (strcmp(argv[1], "scramble_n") == 0)
-	{
-		int *alg = (int *)malloc(sizeof(int) * 23);
-		cube_default(&c_main);
-		cube_scramble(alg, 22);
-		cube_perform_alg(&c_main, alg, 0);
-		cube_print_algorithm(alg);
-		printf("\n");
-		cube_out(&c_main, 1, -1);
-		free(alg);
-	}
-	else if (strcmp(argv[1], "scramble_o") == 0)
-	{
-		int *alg = (int *)malloc(sizeof(int) * 23);
-		cube_read(&c_main);
-		srand(time(NULL));
-		cube_scramble(alg, 22);
-		cube_perform_alg(&c_main, alg, 0);
-		cube_print_algorithm(alg);
-		printf("\n");
-		cube_out(&c_main, 1, -1);
-		free(alg);
-	}
-	else if (strcmp(argv[1], "solve") == 0)
-	{
-		int *alg = (int *)malloc(sizeof(int));
-		cube_read(&c_main);
-		cube_recolor(&c_main);
-		cube_solve(&c_main, &alg);
-		cube_optimize_algorithm(alg);
-		cube_print_algorithm(alg);
-		printf("\n");
-		cube_perform_alg(&c_main, alg, 1);
-		free(alg);
-	}
-	else if (strcmp(argv[1], "perform") == 0)
-	{
-		if (argc < 3)
-		{
-			return 1;
-		}
-		cube_read(&c_main);
-		cube_perform(&c_main, atoi(argv[2]));
-		cube_out(&c_main, 1, -1);
-	}
-	else
-	{
-	}
-	*/
 	return 0;
 }

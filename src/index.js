@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 
 import "./index.css";
+import "purecss/build/pure.css";
+
 import { Vector3 } from "three";
 import { createRuntime } from "./runtime";
 import { createBoxWithRoundedEdges, rotateAboutPoint } from "./threeUtils";
@@ -10,8 +12,8 @@ import {
     runtimeFacePermutation,
     solvedCube,
     planePermutations,
-    operations,
 } from "./constants";
+import { createControls } from "./controls";
 
 const getRank = (i, j, k) => {
     return Math.abs(i) + Math.abs(j) + Math.abs(k);
@@ -243,6 +245,8 @@ const createRubiksCube = () => {
 
 async function init() {
     var runtime = await createRuntime();
+    window._runtime = runtime;
+
     var scene = new THREE.Scene();
     var camera = new THREE.PerspectiveCamera(
         75,
@@ -277,36 +281,44 @@ async function init() {
     const [rubiksCube, allCubicles, allFaces] = createRubiksCube();
     scene.add(rubiksCube);
 
-    var currentCube = [...solvedCube];
-    setColors(allFaces, currentCube);
+    const state = {
+        runtime,
+        currentCube: [...solvedCube],
+        operationQueue: [],
+        setColors: (cubeData) => setColors(allFaces, cubeData),
+    };
+    setColors(allFaces, state.currentCube);
 
-    var operationIndex = 0;
-    var animation = createAnimation(allCubicles, operations[operationIndex]);
+    var animation = null;
+    var currentOperation = null;
 
-    var animate = function () {
+    const animate = () => {
         window.requestAnimationFrame(animate);
         // eslint-disable-next-line no-constant-condition
-        if (true) {
-            const operation = operations[operationIndex];
-
+        if (currentOperation !== null) {
             if (animation.finished()) {
                 animation.reset();
-                currentCube = runtime.performOperation(
-                    currentCube,
-                    operation.code
+                state.currentCube = runtime.performOperation(
+                    state.currentCube,
+                    currentOperation.code
                 );
-                setColors(allFaces, currentCube);
-                operationIndex = (operationIndex + 1) % operations.length;
-                animation = createAnimation(
-                    allCubicles,
-                    operations[operationIndex]
-                );
+                setColors(allFaces, state.currentCube);
+                currentOperation = null;
+            } else {
+                animation.step();
             }
-
-            animation.step();
         }
+
+        if (currentOperation === null && state.operationQueue.length !== 0) {
+            currentOperation = state.operationQueue.shift();
+            animation = createAnimation(allCubicles, currentOperation);
+        }
+
         renderer.render(scene, camera);
     };
+
+    createControls(state);
+
     window.requestAnimationFrame(animate);
 }
 
