@@ -32,10 +32,6 @@ export const createControls = (state) => {
                 .map((c) => operations.find(({ code }) => code === c))
         );
     });
-    addButton(topBar, "Recolor", () => {
-        state.currentCube = state.runtime.recolor(state.currentCube);
-        state.setColors(state.currentCube);
-    });
     addButton(topBar, "Solve", () => {
         state.operationQueue.push(
             ...state.runtime
@@ -43,9 +39,12 @@ export const createControls = (state) => {
                 .map((c) => operations.find(({ code }) => code === c))
         );
     });
+    addButton(topBar, "GitHub", () => {
+        location.href = "https://github.com/tibordp/neishauben";
+    });
 
     operations
-        //.filter(({ category }) => category === "Basic")
+        .filter(({ category }) => category === "Basic")
         .forEach((operation) => {
             addButton(bottomBar, operation.displayName, () => {
                 state.operationQueue.push(operation);

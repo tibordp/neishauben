@@ -278,6 +278,8 @@ async function init() {
     controls.enableDamping = true;
     controls.dampingFactor = 0.25;
     controls.enableZoom = false;
+    camera.rotation.set(-0.041, 1.9, -1.21);
+    controls.update();
 
     const onWindowResize = () => {
         camera.aspect = window.innerWidth / window.innerHeight;
