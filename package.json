@@ -5,11 +5,12 @@
   "version": "0.0.1",
   "scripts": {
     "build:bundle": "webpack",
-    "build:wasm": "docker run --rm -v $(pwd):/src emscripten/emsdk emcc -g -O0 -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='[\"cwrap\",\"getValue\",\"setValue\"]' -s ALLOW_MEMORY_GROWTH=1 -s ENVIRONMENT=web -s MODULARIZE=1 -s 'EXPORT_NAME=\"rubiks\"' -o ./src/rubiks.js ./src/rubiks.c",
-    "build": "npm run build:wasm && npm run build:bundle",
+    "build:wasm:production": "docker run --rm -v $(pwd):/src emscripten/emsdk emcc -O3 -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='[\"cwrap\",\"getValue\",\"setValue\"]' -s ENVIRONMENT=web -s MODULARIZE=1 -s 'EXPORT_NAME=\"rubiks\"' -o ./src/rubiks.js ./src/rubiks.c",
+    "build:wasm:dev": "docker run --rm -v $(pwd):/src emscripten/emsdk emcc -g -O0 -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='[\"cwrap\",\"getValue\",\"setValue\"]' -s ENVIRONMENT=web -s MODULARIZE=1 -s 'EXPORT_NAME=\"rubiks\"' -o ./src/rubiks.js ./src/rubiks.c",
+    "build": "npm run build:wasm:production && npm run build:bundle",
     "lint": "eslint src/",
     "lint:fix": "eslint --fix src/",
-    "dev": "webpack --mode=development serve"
+    "dev": "npm run build:wasm:dev && webpack --mode=development serve"
   },
   "devDependencies": {
     "clean-webpack-plugin": "^3.0.0",

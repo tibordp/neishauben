@@ -23,6 +23,7 @@ const resetCubicle = (cubicle) => {
     const [i, j, k] = cubicle.userData;
     cubicle.position.set(i, j, k);
     cubicle.rotation.set(0, 0, 0);
+    cubicle.updateMatrix();
 };
 
 const getCubiclesForPlane = (allCubicles, plane, numLayers) => {
@@ -110,6 +111,7 @@ const createAnimation = (allCubicles, operation) => {
                     theta * direction,
                     true
                 );
+                cubicle.updateMatrix();
             });
         },
         reset() {
@@ -171,6 +173,8 @@ const createFace = (i, j, k, label) => {
     }
     face.position.set(i / 2, j / 2, k / 2);
     face.position.multiplyScalar(1.001);
+    face.matrixAutoUpdate = false;
+    face.updateMatrix();
     face.userData = [i, j, k];
 
     return face;
@@ -189,6 +193,8 @@ const createRubiksCube = () => {
     const allCubicles = [];
 
     const rubiksCube = new THREE.Group();
+    rubiksCube.matrixAutoUpdate = false;
+
     for (var i = -1; i < 2; ++i) {
         for (var j = -1; j < 2; ++j) {
             for (var k = -1; k < 2; ++k) {
@@ -229,6 +235,7 @@ const createRubiksCube = () => {
                 }
                 const cubicle = createCubicle(0xcccccc);
                 cubicle.userData = [i, j, k];
+                cubicle.matrixAutoUpdate = false;
                 resetCubicle(cubicle);
 
                 cubicle.add(...faces);
@@ -258,7 +265,9 @@ async function init() {
     scene.add(camera);
 
     var renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
+
     document.body.appendChild(renderer.domElement);
 
     var light = new THREE.PointLight(0xffffff, 1.2, 100);

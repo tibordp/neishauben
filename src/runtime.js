@@ -67,7 +67,7 @@ export const createRuntime = async () => {
         scramble(length) {
             var stackPtr = runtime.stackSave();
             var ptr = runtime.stackAlloc(length + 1);
-            runtime._cube_scramble(ptr, length);
+            runtime._scramble(ptr, length);
             const result = [];
             for (var i = 0; ; ++i) {
                 const operationCode = runtime.getValue(ptr + i);
