@@ -77,7 +77,7 @@ const getCubiclesForPlane = (allCubicles, plane, numLayers) => {
     return [pivotCubicle, results];
 };
 
-const createAnimation = (allCubicles, operation) => {
+const createAnimation = (allCubicles, operation, animationSpeed) => {
     const { plane, direction, layers, quarterTurns } = operation;
     const targetRotation = (quarterTurns * Math.PI) / 2;
     var remaining = targetRotation;
@@ -100,7 +100,8 @@ const createAnimation = (allCubicles, operation) => {
                         2
                     )) *
                 0.07 *
-                quarterTurns;
+                quarterTurns *
+                animationSpeed;
             remaining -= theta;
 
             cubicles.forEach((cubicle) => {
@@ -296,7 +297,23 @@ async function init() {
         runtime,
         currentCube: [...solvedCube],
         operationQueue: [],
-        setColors: (cubeData) => setColors(allFaces, cubeData),
+        queueListeners: [],
+        animationSpeed: 1,
+        setColors(cubeData) {
+            this.currentCube = cubeData;
+            setColors(allFaces, this.currentCube);
+        },
+        enqueueOperation(...operations) {
+            this.operationQueue.push(...operations);
+            this.queueListeners.forEach((callback) => callback());
+        },
+        clearQueue() {
+            this.operationQueue = [];
+            this.queueListeners.forEach((callback) => callback());
+        },
+        addQueueChangeListener(callback) {
+            this.queueListeners.push(callback);
+        },
     };
     setColors(allFaces, state.currentCube);
 
@@ -322,7 +339,13 @@ async function init() {
 
         if (currentOperation === null && state.operationQueue.length !== 0) {
             currentOperation = state.operationQueue.shift();
-            animation = createAnimation(allCubicles, currentOperation);
+            state.queueListeners.forEach((callback) => callback());
+
+            animation = createAnimation(
+                allCubicles,
+                currentOperation,
+                state.animationSpeed
+            );
         }
 
         renderer.render(scene, camera);
@@ -334,3 +357,16 @@ async function init() {
 }
 
 init();
+
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker
+            .register(__webpack_public_path__ + "service-worker.js")
+            .then((registration) => {
+                console.log("SW registered: ", registration);
+            })
+            .catch((registrationError) => {
+                console.log("SW registration failed: ", registrationError);
+            });
+    });
+}
