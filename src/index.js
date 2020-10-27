@@ -126,7 +126,11 @@ const createAnimation = (allCubicles, operation, animationSpeed) => {
 
 const createCubicle = (color) => {
     var geometry = createBoxWithRoundedEdges(1, 1, 1, 0.05, 5);
-    var material = new THREE.MeshStandardMaterial({ color });
+    var material = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.7,
+    });
     const cube = new THREE.Mesh(geometry, material);
     return cube;
 };
@@ -156,7 +160,7 @@ const createFace = (i, j, k, label) => {
     const geometry = new THREE.PlaneBufferGeometry(0.9, 0.9, 1, 1);
     geometry.center();
 
-    const material = new THREE.MeshStandardMaterial({
+    const material = new THREE.MeshBasicMaterial({
         color: 0x000000,
         map: texture || null,
         side: THREE.DoubleSide,
@@ -234,7 +238,8 @@ const createRubiksCube = () => {
                         faces.push(createFace(0, 0, k));
                         break;
                 }
-                const cubicle = createCubicle(0xcccccc);
+
+                const cubicle = createCubicle(0x222222);
                 cubicle.userData = [i, j, k];
                 cubicle.matrixAutoUpdate = false;
                 resetCubicle(cubicle);
@@ -266,14 +271,10 @@ async function init() {
     scene.add(camera);
 
     var renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setClearColor(0xf5f2f0);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
-
     document.body.appendChild(renderer.domElement);
-
-    var light = new THREE.PointLight(0xffffff, 1.2, 100);
-    light.position.set(0, 0, 5);
-    camera.add(light);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;

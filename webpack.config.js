@@ -16,7 +16,7 @@ module.exports = {
     plugins: [
         new CleanWebpackPlugin(),
         new FaviconsWebpackPlugin({
-            logo: './static/logo.svg',
+            logo: './static/logo.png',
             mode: 'webapp',
             devMode: 'webapp',
             favicons: {
@@ -24,8 +24,8 @@ module.exports = {
               appDescription: 'Rubik\'s Cube Simulator',
               developerName: 'Tibor Durica Potpara',
               developerURL: 'https://ojdip.net',
-              background: '#000',
-              theme_color: '#fff',
+              background: '#f5f2f0',
+              theme_color: '#3484d5',
               scope: "/neishauben/",
               start_url: "/neishauben/",
               icons: {

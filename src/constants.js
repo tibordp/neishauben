@@ -1,10 +1,10 @@
 export const colors = [
-    0x1919aa,
-    0x00cd00,
-    0xffff00,
-    0xffffff,
-    0xff7500,
-    0xde1a1a,
+    0x3484d5,
+    0x41c248,
+    0xf3df40,
+    0xeceadd,
+    0xf7762e,
+    0xf22d54,
 ];
 
 // prettier-ignore
