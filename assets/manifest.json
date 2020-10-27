@@ -6,7 +6,8 @@
   "lang": "en-US",
   "display": "standalone",
   "orientation": "any",
-  "start_url": "/?homescreen=1",
+  "scope": "/neishauben/",
+  "start_url": "/neishauben/",
   "background_color": "#000",
   "theme_color": "#fff",
   "icons": [
