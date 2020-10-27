@@ -8,8 +8,8 @@
   "orientation": "any",
   "scope": "/neishauben/",
   "start_url": "/neishauben/",
-  "background_color": "#000",
-  "theme_color": "#fff",
+  "background_color": "#f5f2f0",
+  "theme_color": "#3484d5",
   "icons": [
     {
       "src": "/neishauben/assets/android-chrome-36x36.png",
