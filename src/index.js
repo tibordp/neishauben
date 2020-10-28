@@ -125,11 +125,11 @@ const createAnimation = (allCubicles, operation, animationSpeed) => {
 };
 
 const createCubicle = (color) => {
-    var geometry = createBoxWithRoundedEdges(1, 1, 1, 0.05, 5);
+    var geometry = createBoxWithRoundedEdges(0.99, 0.99, 0.99, 0.07, 5);
     var material = new THREE.MeshBasicMaterial({
         color,
         transparent: true,
-        opacity: 0.7,
+        opacity: 0.8,
     });
     const cube = new THREE.Mesh(geometry, material);
     return cube;
@@ -142,7 +142,7 @@ const createFace = (i, j, k, label) => {
         canvas.width = 256;
 
         var context = canvas.getContext("2d");
-        const size = 48;
+        const size = 75;
         const text = `${label}`;
         context.font = size + "pt Arial";
 
@@ -157,7 +157,7 @@ const createFace = (i, j, k, label) => {
         texture.needsUpdate = true;
     }
 
-    const geometry = new THREE.PlaneBufferGeometry(0.9, 0.9, 1, 1);
+    const geometry = new THREE.PlaneBufferGeometry(0.88, 0.88, 1, 1);
     geometry.center();
 
     const material = new THREE.MeshBasicMaterial({
@@ -177,7 +177,7 @@ const createFace = (i, j, k, label) => {
         face.rotateY(Math.PI);
     }
     face.position.set(i / 2, j / 2, k / 2);
-    face.position.multiplyScalar(1.001);
+    //face.position.multiplyScalar(1.01);
     face.matrixAutoUpdate = false;
     face.updateMatrix();
     face.userData = [i, j, k];
@@ -210,7 +210,7 @@ const createRubiksCube = () => {
 
                 switch (getRank(i, j, k)) {
                     case 0: // center of the cube
-                        break;
+                        continue;
                     case 1: {
                         // center of the face
                         const label = planePermutations.find(
@@ -280,19 +280,14 @@ async function init() {
     controls.enableDamping = true;
     controls.dampingFactor = 0.25;
     controls.enableZoom = false;
-    camera.rotation.set(-0.041, 1.9, -1.21);
+    controls.enableKeys = false;
     controls.update();
-
-    const onWindowResize = () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    };
-
-    window.addEventListener("resize", onWindowResize, false);
 
     const [rubiksCube, allCubicles, allFaces] = createRubiksCube();
     scene.add(rubiksCube);
+
+    var isRendering = false;
+    var renderFunc;
 
     const state = {
         runtime,
@@ -300,13 +295,21 @@ async function init() {
         operationQueue: [],
         queueListeners: [],
         animationSpeed: 1,
+        checkAndStartRendering() {
+            if (!isRendering) {
+                isRendering = true;
+                window.requestAnimationFrame(renderFunc);
+            }
+        },
         setColors(cubeData) {
             this.currentCube = cubeData;
             setColors(allFaces, this.currentCube);
+            this.checkAndStartRendering();
         },
         enqueueOperation(...operations) {
             this.operationQueue.push(...operations);
             this.queueListeners.forEach((callback) => callback());
+            this.checkAndStartRendering();
         },
         clearQueue() {
             this.operationQueue = [];
@@ -316,29 +319,25 @@ async function init() {
             this.queueListeners.push(callback);
         },
     };
-    setColors(allFaces, state.currentCube);
 
     var animation = null;
     var currentOperation = null;
 
-    const animate = () => {
-        window.requestAnimationFrame(animate);
-        // eslint-disable-next-line no-constant-condition
+    renderFunc = () => {
         if (currentOperation !== null) {
             if (animation.finished()) {
                 animation.reset();
-                state.currentCube = runtime.performOperation(
-                    state.currentCube,
-                    currentOperation.code
+                state.setColors(
+                    runtime.performOperation(
+                        state.currentCube,
+                        currentOperation.code
+                    )
                 );
-                setColors(allFaces, state.currentCube);
                 currentOperation = null;
             } else {
                 animation.step();
             }
-        }
-
-        if (currentOperation === null && state.operationQueue.length !== 0) {
+        } else if (state.operationQueue.length !== 0) {
             currentOperation = state.operationQueue.shift();
             state.queueListeners.forEach((callback) => callback());
 
@@ -347,14 +346,37 @@ async function init() {
                 currentOperation,
                 state.animationSpeed
             );
+        } else {
+            isRendering = false;
         }
-
+        if (isRendering) {
+            window.requestAnimationFrame(renderFunc);
+        }
+        // Rendering happens only here, and is invoked through
+        // requestAnimationFrame. If a scene needs to be re-rendered when
+        // there is no animation running, we can start the loop and
+        // have it render one frame before exiting. This is rudimentary
+        // debouncing, to ensure that fast event listeners do not cause
+        // excessive re-rendering.
         renderer.render(scene, camera);
     };
 
     createControls(state);
 
-    window.requestAnimationFrame(animate);
+    controls.addEventListener("change", () => state.checkAndStartRendering());
+    window.addEventListener(
+        "resize",
+        () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            state.checkAndStartRendering();
+        },
+        false
+    );
+
+    state.setColors([...solvedCube]);
+    state.checkAndStartRendering();
 }
 
 init();
