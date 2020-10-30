@@ -1,4 +1,4 @@
-import { Shape, ExtrudeBufferGeometry } from "three";
+import { Shape, ExtrudeBufferGeometry, ShapeBufferGeometry } from "three";
 
 export function createBoxWithRoundedEdges(
     width,
@@ -36,20 +36,48 @@ export function createBoxWithRoundedEdges(
     return geometry;
 }
 
-export function rotateAboutPoint(obj, point, axis, theta, pointIsWorld) {
-    pointIsWorld = pointIsWorld === undefined ? false : pointIsWorld;
-
-    if (pointIsWorld) {
-        obj.parent.localToWorld(obj.position); // compensate for world coordinate
-    }
-
+export function rotateAboutPoint(obj, point, axis, theta) {
     obj.position.sub(point); // remove the offset
     obj.position.applyAxisAngle(axis, theta); // rotate the POSITION
     obj.position.add(point); // re-add the offset
-
-    if (pointIsWorld) {
-        obj.parent.worldToLocal(obj.position); // undo world coordinates compensation
-    }
-
     obj.rotateOnAxis(axis, theta); // rotate the OBJECT
+}
+
+export function createRoundRect(width, height, radius) {
+    let shape = new Shape();
+    shape.absarc(
+        -width / 2 + radius,
+        -height / 2 + radius,
+        radius,
+        -Math.PI / 2,
+        -Math.PI,
+        true
+    );
+    shape.absarc(
+        -width / 2 + radius,
+        height / 2 - radius,
+        radius,
+        Math.PI,
+        Math.PI / 2,
+        true
+    );
+    shape.absarc(
+        width / 2 - radius,
+        height / 2 - radius,
+        radius,
+        Math.PI / 2,
+        0,
+        true
+    );
+    shape.absarc(
+        width / 2 - radius,
+        -height / 2 + radius,
+        radius,
+        0,
+        -Math.PI / 2,
+        true
+    );
+    const geometry = new ShapeBufferGeometry(shape, 5);
+    geometry.center();
+    return geometry;
 }

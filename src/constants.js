@@ -87,4 +87,10 @@ export const operations = [
     { code: 45, displayName: "z2", plane: 0, direction:  1, layers:  3, quarterTurns: 2, category: "Whole Cube" },
     { code: 46, displayName: "y2", plane: 2, direction:  1, layers:  3, quarterTurns: 2, category: "Whole Cube" },
     { code: 47, displayName: "x2", plane: 5, direction:  1, layers:  3, quarterTurns: 2, category: "Whole Cube" },
+    { code: 48, displayName: "f2",  plane: 0, direction: 1, layers:  2, quarterTurns: 2, category: "Two Layers" },
+    { code: 49, displayName: "b2",  plane: 1, direction: 1, layers:  2, quarterTurns: 2, category: "Two Layers" },
+    { code: 50, displayName: "u2",  plane: 2, direction: 1, layers:  2, quarterTurns: 2, category: "Two Layers" },
+    { code: 51, displayName: "d2",  plane: 3, direction: 1, layers:  2, quarterTurns: 2, category: "Two Layers" },
+    { code: 52, displayName: "l2",  plane: 4, direction: 1, layers:  2, quarterTurns: 2, category: "Two Layers" },
+    { code: 53, displayName: "r2",  plane: 5, direction: 1, layers:  2, quarterTurns: 2, category: "Two Layers" },
 ];
