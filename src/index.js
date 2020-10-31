@@ -6,7 +6,11 @@ import "purecss/build/pure.css";
 
 import { Vector3 } from "three";
 import { createRuntime } from "./runtime";
-import { createBoxWithRoundedEdges, rotateAboutPoint } from "./threeUtils";
+import {
+    createBoxWithRoundedEdges,
+    rotateAboutPoint,
+    createRoundRect,
+} from "./threeUtils";
 import {
     colors,
     runtimeFacePermutation,
@@ -124,12 +128,11 @@ const createAnimation = (allCubicles, operation, animationSpeed) => {
     };
 };
 
-const createCubicle = (color) => {
-    var geometry = createBoxWithRoundedEdges(0.99, 0.99, 0.99, 0.07, 5);
+const createCubicle = () => {
+    var geometry = createBoxWithRoundedEdges(1, 1, 1, 0.07, 5);
     var material = new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity: 0.8,
+        color: 0x333333,
+        opacity: 1,
     });
     const cube = new THREE.Mesh(geometry, material);
     return cube;
@@ -154,16 +157,23 @@ const createFace = (i, j, k, label) => {
         context.fillStyle = "black";
         context.fillText(text, canvas.width / 2, canvas.height / 2);
         var texture = new THREE.Texture(canvas);
+        texture.offset.set(0.5, 0.5);
         texture.needsUpdate = true;
     }
 
-    const geometry = new THREE.PlaneBufferGeometry(0.88, 0.88, 1, 1);
+    const geometry = createRoundRect(0.88, 0.88, 0.05);
     geometry.center();
 
     const material = new THREE.MeshBasicMaterial({
         color: 0x000000,
         map: texture || null,
         side: THREE.DoubleSide,
+        transparent: true,
+        depthTest: true,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -4,
     });
     var face = new THREE.Mesh(geometry, material);
 
@@ -239,7 +249,7 @@ const createRubiksCube = () => {
                         break;
                 }
 
-                const cubicle = createCubicle(0x222222);
+                const cubicle = createCubicle();
                 cubicle.userData = [i, j, k];
                 cubicle.matrixAutoUpdate = false;
                 resetCubicle(cubicle);
@@ -279,8 +289,11 @@ async function init() {
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.25;
-    controls.enableZoom = false;
+    controls.enableZoom = true;
     controls.enableKeys = false;
+    controls.enablePan = false;
+    controls.minDistance = 4;
+    controls.maxDistance = 8;
     controls.update();
 
     const [rubiksCube, allCubicles, allFaces] = createRubiksCube();

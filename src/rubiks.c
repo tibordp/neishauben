@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stdint.h>
+
+#define OPT_LOOKUP_LENGTH 3
+#define OPT_LOOKUP_SIZE 19*19*19
 
 typedef struct var {
   char sides[6][9];
@@ -42,8 +46,30 @@ char sp_corner_transform[4] = {0, 2, 8, 6};
 
 #define cube_inverse(x) (((x / 2) * 2) - (x % 2) + 1)
 
-int record_algorithm[1024];
+int record_algorithm[512];
 int record_count = 0;
+int optimizations_lookup[OPT_LOOKUP_SIZE];
+
+
+int cube_optimize_pack_tuple(int* index) {
+  int cnt, value = 0;
+  for (cnt = 0; cnt < OPT_LOOKUP_LENGTH; ++cnt) { 
+    value = value*19 + (index[cnt] < 12 ? index[cnt] : index[cnt] - 12) + 1; 
+  }
+  return value;
+}
+
+int cube_optimize_unpack_tuple(int value, int* index) {
+  int len = 0;
+  int cnt; 
+  for (cnt = OPT_LOOKUP_LENGTH-1; cnt >= 0; --cnt) {
+    len += value > 0 ? 1 : 0;
+    index[cnt] = value % 19 - 1;
+    index[cnt] = index[cnt] < 12 ? index[cnt] : index[cnt] + 12;
+    value /= 19;
+  }
+  return len;
+}
 
 void cube_init() {
   int x, y;
@@ -62,11 +88,22 @@ void cube_init() {
   }
 }
 
+
 void cube_default(cube *src) {
   int cnt, cnt2;
   for (cnt = 0; cnt < 6; cnt++) {
     for (cnt2 = 0; cnt2 < 9; cnt2++) {
       (*src).sides[cnt][cnt2] = cnt;
+    }
+  }
+}
+
+void cube_mark(cube *src) {
+  int cnt, cnt2;
+  int val = 0;
+  for (cnt = 0; cnt < 6; cnt++) {
+    for (cnt2 = 0; cnt2 < 9; cnt2++) {
+      (*src).sides[cnt][cnt2] = val++;
     }
   }
 }
@@ -274,10 +311,8 @@ void cube_perform(cube *src_c, int operation) {
   cube cube_copy = *src_c;
 
   int cnt;
-  if (operation < 0) {
-    return;
-  }
-  if (operation < 12) {
+  // F, F', B, B' U, U', D, D', L, L', R, R'
+  if (operation >= 0 && operation < 12) {
     cube_perform_rotate((*src_c).sides[operation / 2], operation % 2);
     for (cnt = 0; cnt < 4; cnt++) {
       cube_perform_swap_edges(
@@ -288,7 +323,8 @@ void cube_perform(cube *src_c, int operation) {
           cube_transform[operation / 2][cnt][3 - (operation % 2)]);
     }
   }
-  if ((operation < 24) && (operation > 11)) {
+  // f, f', b, b' u, u', d, d', l, l', r, r'
+  else if (operation >= 12 && operation < 24) {
     int face_num = operation - 12;
     cube_perform_rotate((*src_c).sides[face_num / 2], face_num % 2);
     for (cnt = 0; cnt < 4; cnt++) {
@@ -304,7 +340,8 @@ void cube_perform(cube *src_c, int operation) {
           cube_transform[face_num / 2][cnt][3 - (face_num % 2)]);
     }
   }
-  if ((operation < 30) && (operation > 23)) {
+  // F2, B2, U2, D2, L2, R2
+  else if (operation >= 24 && operation < 30) {
     int face_num = operation - 24;
     cube_perform_rotate((*src_c).sides[face_num], 2);
     for (cnt = 0; cnt < 4; cnt++) {
@@ -315,12 +352,12 @@ void cube_perform(cube *src_c, int operation) {
           halfturn_transform[face_num][cnt / 2][3 - (cnt % 2)]);
     }
   }
-
-  if ((operation < 36) && (operation > 29)) {
+  // z, z', y, y', x', x
+  else if (operation >= 30 && operation < 36) {
     cube_perform_rotate_cube(src_c, operation - 30);
   }
-
-  if ((operation < 42) && (operation > 35)) {
+  // S, S', E', E, M, M'
+  else if (operation >= 36 && operation < 42) {
     int face_num = operation - 36;
     for (cnt = 0; cnt < 4; cnt++) {
       cube_perform_swap_middles(
@@ -329,8 +366,8 @@ void cube_perform(cube *src_c, int operation) {
           cube_transform[face_num][cnt][2], cube_transform[face_num][cnt][3]);
     }
   }
-
-  if ((operation < 45) && (operation > 41)) {
+  // S2, E2, M2
+  else if (operation >= 42 && operation < 45) {
     int face_num = operation - 42;
     for (cnt = 0; cnt < 4; cnt++) {
       cube_perform_swap_middles(
@@ -341,20 +378,29 @@ void cube_perform(cube *src_c, int operation) {
           halfturn_transform[face_num * 2][cnt / 2][3 - (cnt % 2)]);
     }
   }
-  if ((operation < 48) && (operation > 44)) {
+  // z2, y2, x2
+  else if (operation >= 45 && operation < 48) {
     cube_perform_rotate_cube(src_c, (operation - 45) * 2);
     cube_perform_rotate_cube(src_c, (operation - 45) * 2);
   }
-}
-
-void cube_find_center(cube *source, int color, int *face) {
-  int cnt;
-  *face = -1;
-  for (cnt = 0; cnt < 6; cnt++) {
-    if (color == (*source).sides[cnt][4]) {
-      *face = cnt;
+  // f2, b2, u2, d2, l2, r2
+  else if (operation >= 48 && operation < 54) {
+    int face_num = operation - 48;
+    cube_perform_rotate((*src_c).sides[face_num], 2);
+    for (cnt = 0; cnt < 4; cnt++) {
+      cube_perform_swap_edges(
+          cube_copy.sides[halfturn_transform[face_num][cnt / 2][cnt % 2]],
+          (*src_c).sides[halfturn_transform[face_num][cnt / 2][1 - (cnt % 2)]],
+          halfturn_transform[face_num][cnt / 2][2 + (cnt % 2)],
+          halfturn_transform[face_num][cnt / 2][3 - (cnt % 2)]);
+      cube_perform_swap_middles(
+          cube_copy.sides[halfturn_transform[face_num ][cnt / 2][cnt % 2]],
+          (*src_c)
+              .sides[halfturn_transform[face_num][cnt / 2][1 - (cnt % 2)]],
+          halfturn_transform[face_num][cnt / 2][2 + (cnt % 2)],
+          halfturn_transform[face_num][cnt / 2][3 - (cnt % 2)]);      
     }
-  }
+  }  
 }
 
 void cube_find_edge(cube *source, int color1, int color2, int *face1,
@@ -1171,6 +1217,7 @@ int cube_ll_corners_align(cube *source) {
     sp_perform(source, st_col * 2 + 1);
     return sp_perform(source, -1);
   }
+  return -1;
 }
 
 void cube_ll_corners_orient_scan_state(cube *source, int st_col, int *state,
@@ -1215,7 +1262,7 @@ void cube_ll_corners_orient_scan_state(cube *source, int st_col, int *state,
   *orientation = cnt;
 }
 
-int cube_ll_corners_orient_perform_twist(cube *src, int st_col, int dir,
+void cube_ll_corners_orient_perform_twist(cube *src, int st_col, int dir,
                                          int mode) {
   int ff = cube_transform[st_col][(dir + 3) % 4][0];
   if (mode == 0) {
@@ -1275,7 +1322,7 @@ int cube_ll_corners_orient(cube *source) {
   return sp_perform(source, -1);
 }
 
-int cube_ll_permute_edges_perform_exchange(cube *src, int st_col, int dir,
+void cube_ll_permute_edges_perform_exchange(cube *src, int st_col, int dir,
                                            int mode) {
   int ff = cube_transform[st_col][(dir + 3) % 4][0];
   if (mode == 0) {
@@ -1339,64 +1386,32 @@ int cube_ll_permute_edges(cube *source) {
   return sp_perform(source, -1);
 }
 
-int cube_optimize_algorithm_s_pop(int *stack_pos, int *stack) {
-  if ((*stack_pos) == 0) {
-    return 0xFF;
-  }
-  (*stack_pos)--;
-  return stack[*stack_pos];
-}
-void cube_optimize_algorithm_s_push(int *stack_pos, int *stack, int value) {
-  (*stack_pos)++;
-  stack[(*stack_pos) - 1] = value;
+int* cube_optimize_apply(int* pos, int packed) {
+  int step[OPT_LOOKUP_LENGTH];
+  int i;
+  int len = cube_optimize_unpack_tuple(packed, step);
+  memcpy(&pos[-OPT_LOOKUP_LENGTH+1],&step[OPT_LOOKUP_LENGTH-len], len*sizeof(int));
+  return &pos[-OPT_LOOKUP_LENGTH+len];
 }
 
-void cube_optimize_algorithm_parse(int value, int *class, int *face) {
-  if ((value > 23) && (value < 31)) {
-    *face = value - 24;
-    *class = 2;
-  } else if (value < 12) {
-    *face = value / 2;
-    *class = value % 2;
-  }
-}
-
-int *cube_optimize_algorithm(int *alg) {
-  int stack_pos = 0;
-  int stack[1024];
-
-  int count = 0;
-  int cnt, vll, v1, c1, v2, c2;
-  while (alg[count] != -1) {
-    count++;
-  }
-  for (cnt = 0; cnt < count; cnt++) {
-    cube_optimize_algorithm_parse(alg[cnt], &c1, &v1);
-    vll = cube_optimize_algorithm_s_pop(&stack_pos, stack);
-    cube_optimize_algorithm_parse(vll, &c2, &v2);
-    if ((v2 != v1) || (vll == 0xff) || (alg[cnt] < 0)) {
-      if (vll != 0xff) {
-        cube_optimize_algorithm_s_push(&stack_pos, stack, vll);
-      }
-      cube_optimize_algorithm_s_push(&stack_pos, stack, alg[cnt]);
-    } else {
-      if (((c1 == 0) && (c2 == 1)) || ((c1 == 1) && (c2 == 0)) ||
-          ((c1 == 2) && (c2 == 2))) {
-      } else if (((c1 == 1) && (c2 == 2)) || ((c1 == 2) && (c2 == 1))) {
-        cube_optimize_algorithm_s_push(&stack_pos, stack, v1 * 2);
-      } else if (((c1 == 0) && (c2 == 2)) || ((c1 == 2) && (c2 == 0))) {
-        cube_optimize_algorithm_s_push(&stack_pos, stack, v1 * 2 + 1);
-      } else {
-        cube_optimize_algorithm_s_push(&stack_pos, stack, v1 + 24);
-      }
+int cube_optimize_algorithm(int *alg) {
+  int cnt;
+  int packed;
+  int offset;
+  int *head = &alg[0];
+  int buf[OPT_LOOKUP_LENGTH];
+  for (cnt = 0; alg[cnt] != -1; cnt++) {
+    if (alg[cnt] < 0) continue;
+    *head = alg[cnt];
+    offset = head-alg < OPT_LOOKUP_LENGTH - 1 ? OPT_LOOKUP_LENGTH-(head-alg)-1 : 0;
+    for (int i = 0; i < OPT_LOOKUP_LENGTH; ++i) {
+      buf[i] = offset < i + 1 ? head[i-OPT_LOOKUP_LENGTH+1] : -1;
     }
+    int packed = cube_optimize_pack_tuple(buf);
+    head = cube_optimize_apply(head + offset, optimizations_lookup[packed]) + 1;
   }
-  cnt = 0;
-  while (cnt < stack_pos) {
-    alg[cnt] = stack[cnt];
-    cnt++;
-  }
-  alg[cnt] = -1;
+  *head = -1;
+  return head - alg;
 }
 
 void cube_recolor(cube *input) {
@@ -1437,6 +1452,11 @@ void cube_solve(cube *source, int *alg) {
     sp_perform(&copy, -2);
     cube_ll_permute_edges(&copy);
     sp_perform(&copy, -2);
+
+    // optimize the algorithm
+    record_algorithm[record_count] = -1;
+    record_count = cube_optimize_algorithm(record_algorithm);
+
     if (record_count < min) {
       memcpy(alg, record_algorithm, sizeof(int) * record_count);
       alg[record_count] = -1;
@@ -1445,17 +1465,16 @@ void cube_solve(cube *source, int *alg) {
   }
 }
 
-int cube_out(cube *cube, char *cube_data) {
+void cube_out(cube *cube, char *cube_data) {
   int i, j;
   for (i = 0; i < 6; i++) {
     for (j = 0; j < 9; j++) {
       *(cube_data++) = (*cube).sides[i][j];
     }
   }
-  return 0;
 }
 
-int cube_read(cube *cube, char *cube_data) {
+void cube_read(cube *cube, char *cube_data) {
   char buf[9];
   int i, j;
   for (i = 0; i < 6; i++) {
@@ -1463,13 +1482,57 @@ int cube_read(cube *cube, char *cube_data) {
       (*cube).sides[i][j] = *(cube_data++);
     }
   }
-  return 0;
+}
+
+
+void cube_populate_optimizations() {
+  int i, j, k, op_num, upper_range;
+  cube cubes[OPT_LOOKUP_SIZE];
+  int index[OPT_LOOKUP_LENGTH];
+  for (op_num = 0; op_num < OPT_LOOKUP_SIZE; ++op_num) {
+      cube_optimize_unpack_tuple(op_num, index);
+      cube_mark(&cubes[op_num]);
+      for (i = 0; i < OPT_LOOKUP_LENGTH; ++i) {
+        cube_perform(&cubes[op_num], index[i]);
+      }
+  }
+  
+  upper_range = OPT_LOOKUP_SIZE / 19;;
+  for (i = OPT_LOOKUP_SIZE-1; i >= 0; --i) {
+    optimizations_lookup[i] = i;
+    // only consider shorter sequences for optimization
+    for (j = upper_range - 1; j >= 0; --j) {
+      if (!memcmp(cubes[j].sides, &cubes[i].sides, sizeof(((cube*)NULL)->sides))) {
+        optimizations_lookup[i] = j;
+      }
+    }
+    if (i == upper_range) {
+      upper_range /= 19;
+    }
+  }
+}
+
+void cube_scramble(int *alg, int depth) {
+  int packed;
+  int offset;
+  int *head = &alg[0];
+  int buf[OPT_LOOKUP_LENGTH];
+  while (head - alg < depth) {
+    *head = rand() % 12;
+    offset = head-alg < OPT_LOOKUP_LENGTH - 1 ? OPT_LOOKUP_LENGTH-(head-alg)-1 : 0;
+    for (int i = 0; i < OPT_LOOKUP_LENGTH; ++i) {
+      buf[i] = offset < i + 1 ? head[i-OPT_LOOKUP_LENGTH+1] : -1;
+    }
+    int packed = cube_optimize_pack_tuple(buf);
+    head = cube_optimize_apply(head + offset, optimizations_lookup[packed]) + 1;
+  }
 }
 
 EMSCRIPTEN_KEEPALIVE
 int init() {
   srand(time(NULL));
   cube_init();
+  cube_populate_optimizations();
   return 0;
 }
 
@@ -1492,43 +1555,28 @@ int recolor(char *cube_data) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-void scramble(char *alg, int depth) {
-  int cnt;
-  int dum, cur;
-  int prev = -1;
-  for (cnt = 0; cnt < depth; cnt++) {
-    do {
-      if (cnt != 0) {
-        prev = cur;
-      }
-      dum = rand() % 18;
-      if (dum < 12) {
-        alg[cnt] = dum;
-        cur = dum / 2;
-      } else {
-        alg[cnt] = dum + 12;
-        cur = dum - 12;
-      }
-
-    } while (prev == cur);
-  }
-  alg[cnt] = -1;
+void scramble(int *alg, int depth) {
+  cube_scramble(alg, depth);
 }
 
 EMSCRIPTEN_KEEPALIVE
-int solve(char *cube_data, char *out_alg) {
+int scrambled_cube(char *cube_data, char depth) {
   cube c_main;
-  int alg[1024];
+  int alg[depth];
+  cube_default(&c_main);
+  cube_scramble(alg, depth);
+  for (int i = 0; i < depth; ++i) {
+    cube_perform(&c_main, alg[i]);
+  }
+  cube_out(&c_main, cube_data);
+  return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int solve(char *cube_data, int *out_alg) {
+  cube c_main;
   cube_read(&c_main, cube_data);
   cube_recolor(&c_main);
-  cube_solve(&c_main, alg);
-  cube_optimize_algorithm(alg);
-  for (int i = 0; i < 1024; ++i) {
-    out_alg[i] = alg[i];
-    if (alg[i] == -1) {
-      return 0;
-    }
-  }
-
+  cube_solve(&c_main, out_alg);
   return 1;
 }

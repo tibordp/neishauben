@@ -15,6 +15,7 @@ Build process requires Docker in order to compile C code to WebAssembly.
 ```bash
 yarn
 yarn dev
+yarn test
 ```
 
 ### Production build 

@@ -28,6 +28,31 @@ canvas {
     flex-wrap: wrap;
 }
 
+#algorithm {
+    flex-basis: 100%;
+    text-align: center;
+    background-color: rgba(245, 242, 240, 0.7);
+    border-radius: 10px;
+    padding: 5px;   
+}
+
+.algorithm-current {
+    color: #f22d54;
+    background-color: #f22d54;
+    box-sizing: border-box;
+    padding: 4px;
+    color: white;
+    border-radius: 5px;
+    font-weight: bold;
+    position: relative;
+    z-index: 1;
+}
+
+.algorithm-done {
+    font-weight: bold;
+}
+
+
 #top-bar {
     top: 0;
 }
