@@ -20,7 +20,7 @@ yarn dev
 ```
 
 The app will launch at 
-https://localhost:8080/neishauben/
+http://localhost:8080/neishauben/
 
 Tests run with
 ```bash

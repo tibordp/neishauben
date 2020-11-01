@@ -50,17 +50,8 @@ a.algorithm-link {
     text-decoration: inherit;
 }
 
-a.algorithm-link[href]:hover {
+a.algorithm-link[href]:hover, a.algorithm-current {
     background-color: #3484d5;
-    box-sizing: content-box;
-    color: white;
-    border-radius: 5px;
-    position: relative;
-    z-index: 1;
-}
-
-a.algorithm-current {
-    background-color: #f22d54;
     box-sizing: content-box;
     color: white;
     border-radius: 5px;
