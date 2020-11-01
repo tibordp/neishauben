@@ -31,27 +31,50 @@ canvas {
 #algorithm {
     flex-basis: 100%;
     text-align: center;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;   
     background-color: rgba(245, 242, 240, 0.7);
     border-radius: 10px;
     padding: 5px;   
 }
 
-.algorithm-current {
-    color: #f22d54;
-    background-color: #f22d54;
-    box-sizing: border-box;
+#algorithm a {
     padding: 4px;
+    display: block;
+}
+
+a.algorithm-link {
+    color: inherit;
+    text-decoration: inherit;
+}
+
+a.algorithm-link[href]:hover {
+    background-color: #3484d5;
+    box-sizing: content-box;
     color: white;
     border-radius: 5px;
-    font-weight: bold;
     position: relative;
     z-index: 1;
 }
 
-.algorithm-done {
-    font-weight: bold;
+a.algorithm-current {
+    background-color: #f22d54;
+    box-sizing: content-box;
+    color: white;
+    border-radius: 5px;
+    position: relative;
+    z-index: 1;
 }
 
+a.algorithm-done {
+    color: #3484d5;
+}
+
+.more-less-button {
+    background-color: transparent;
+}
 
 #top-bar {
     top: 0;

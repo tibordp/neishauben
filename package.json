@@ -4,17 +4,18 @@
   "private": true,
   "version": "0.0.1",
   "scripts": {
-    "build:bundle": "webpack",
-    "build:wasm:production": "docker run --rm -v $(pwd):/src emscripten/emsdk emcc -O3 -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='[\"cwrap\",\"getValue\",\"setValue\"]' -s ENVIRONMENT=web -s MODULARIZE=1 -s 'EXPORT_NAME=\"rubiks\"' -o ./src/rubiks.js ./src/rubiks.c",
-    "build:wasm:dev": "docker run --rm -v $(pwd):/src emscripten/emsdk emcc -g -O0 -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='[\"cwrap\",\"getValue\",\"setValue\"]' -s ENVIRONMENT=web -s MODULARIZE=1 -s 'EXPORT_NAME=\"rubiks\"' -o ./src/rubiks.js ./src/rubiks.c",
-    "build:wasm:node:dev": "docker run --rm -v $(pwd):/src emscripten/emsdk emcc -g4 -O0 -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='[\"cwrap\",\"getValue\",\"setValue\"]' -s ENVIRONMENT=node -s 'EXPORT_NAME=\"rubiks\"' -o ./src/rubiks.js ./src/rubiks.c",
-    "build:wasm:node:production": "docker run --rm -v $(pwd):/src emscripten/emsdk emcc -O3 -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='[\"cwrap\",\"getValue\",\"setValue\"]' -s ENVIRONMENT=node -s 'EXPORT_NAME=\"rubiks\"' -o ./src/rubiks.js ./src/rubiks.c",
-    "build": "npm run build:wasm:production && npm run build:bundle",
-    "test": "npm run build:wasm:node:dev && jest --watch",
-    "test:ci": "npm run build:wasm:node:dev && jest --ci",
+    "emcc": "docker run --rm -v $(pwd):/src emscripten/emsdk emcc -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='[\"cwrap\",\"getValue\",\"setValue\"]' -s EXPORT_NAME=\"rubiks\"",
+    "wasm:dev": "yarn emcc -g -O0 -s ENVIRONMENT=web -s MODULARIZE=1 -o ./src/rubiks.js ./src/rubiks.c",
+    "wasm:production": "yarn emcc -O3 -s ENVIRONMENT=web -s MODULARIZE=1 -o ./src/rubiks.js ./src/rubiks.c",
+    "wasm:node:dev": "yarn emcc -g -O0 -s ENVIRONMENT=node -o ./src/rubiks.js ./src/rubiks.c",
+    "wasm:node:production": "yarn emcc -O3 -s ENVIRONMENT=node -o ./src/rubiks.js ./src/rubiks.c",
+    "build": "yarn wasm:production && webpack",
+    "test": "yarn wasm:node:dev && jest --watch",
+    "test:ci": "yarn wasm:node:dev && jest --ci",
+    "dev": "yarn wasm:dev && webpack --mode=development serve",
     "lint": "eslint src/",
-    "lint:fix": "eslint --fix src/",
-    "dev": "npm run build:wasm:dev && webpack --mode=development serve"
+    "fmt": "eslint --fix src/",
+    "fmt:c": "clang-format -i -style='{ColumnLimit: 120}' src/rubiks.c"
   },
   "devDependencies": {
     "clean-webpack-plugin": "^3.0.0",

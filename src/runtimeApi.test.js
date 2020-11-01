@@ -1,4 +1,11 @@
-const { scrambled, solve, performOperation } = require("./runtimeApi");
+const {
+    scrambled,
+    solve,
+    scramble,
+    performAlgorithm,
+    invertAlgorithm,
+    isSolved,
+} = require("./runtimeApi");
 const runtime = require("./rubiks");
 
 beforeAll(() => {
@@ -15,15 +22,28 @@ beforeAll(() => {
     });
 });
 
-const solvedCube = new Array(54).fill(0).map((_, i) => Math.floor(i / 9));
+const SOLVED_CUBE = new Array(54).fill(0).map((_, i) => Math.floor(i / 9));
 
 test("solves a rubiks cube", () => {
-    var cube = scrambled(runtime, 50);
-    const alg = solve(runtime, cube);
+    const scrambledCube = scrambled(runtime, 50);
+    const alg = solve(runtime, scrambledCube);
 
-    alg.forEach((operation) => {
-        cube = performOperation(runtime, cube, operation);
-    });
+    expect(isSolved(runtime, scrambledCube)).toBe(false);
+    const solvedCube = performAlgorithm(runtime, scrambledCube, alg);
+    expect(isSolved(runtime, solvedCube)).toBe(true);
+});
 
-    expect(cube).toEqual(solvedCube);
+test("inverts an algorithm", () => {
+    const scrambleAlg = scramble(runtime, 50);
+    const scrambledCube = performAlgorithm(runtime, SOLVED_CUBE, scrambleAlg);
+    expect(isSolved(runtime, scrambledCube)).toBe(false);
+
+    const invertedScrambleAlg = invertAlgorithm(runtime, scrambleAlg);
+
+    const solvedCube = performAlgorithm(
+        runtime,
+        scrambledCube,
+        invertedScrambleAlg
+    );
+    expect(isSolved(runtime, solvedCube)).toBe(true);
 });

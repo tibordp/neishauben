@@ -93,4 +93,4 @@ export const operations = [
     { code: 51, displayName: "d2",  plane: 3, direction: 1, layers:  2, quarterTurns: 2, category: "Two Layers" },
     { code: 52, displayName: "l2",  plane: 4, direction: 1, layers:  2, quarterTurns: 2, category: "Two Layers" },
     { code: 53, displayName: "r2",  plane: 5, direction: 1, layers:  2, quarterTurns: 2, category: "Two Layers" },
-];
+].sort((a, b) => a.category.localeCompare(b.category) || (a.code - b.code));
