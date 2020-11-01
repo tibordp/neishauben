@@ -17,8 +17,11 @@ export const createRuntime = async () => {
 
     return {
         performOperation: runtimeApi.performOperation.bind(this, runtime),
+        performAlgorithm: runtimeApi.performAlgorithm.bind(this, runtime),
+        invertAlgorithm: runtimeApi.invertAlgorithm.bind(this, runtime),
         recolor: runtimeApi.performOperation.bind(this, runtime),
         solve: runtimeApi.solve.bind(this, runtime),
         scramble: runtimeApi.scramble.bind(this, runtime),
+        isSolved: runtimeApi.isSolved.bind(this, runtime),
     };
 };

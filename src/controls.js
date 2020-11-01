@@ -1,9 +1,12 @@
-import { operations } from "./constants";
+import { operations, solvedCube } from "./constants";
 import githubLogo from "../static/github.png";
 
-const addButton = (parent, label, onClick) => {
+const addButton = (parent, label, onClick, className) => {
     var button = document.createElement("button");
     button.className = "pure-button";
+    if (className) {
+        button.classList.add(className);
+    }
     button.innerText = label;
     button.addEventListener("click", onClick);
     parent.appendChild(button);
@@ -33,7 +36,7 @@ const addSlider = (parent, labelText, onChange) => {
     label.innerText = labelText;
     slider.type = "range";
     slider.min = 1;
-    slider.max = 5;
+    slider.max = 10;
     slider.value = 1;
     slider.className = "slider";
     slider.oninput = function () {
@@ -56,11 +59,25 @@ export const createControls = (state) => {
 
     var currentOperations = [];
     var remainingOperations = [];
+    var extraButtonsHidden = true;
 
-    const clearButton = addButton(topBar, "Clear", () => {
+    const createOperationButton = (parent, operation) => {
+        return addButton(parent, operation.displayName, () => {
+            if (remainingOperations.length > 0) {
+                currentOperations = [];
+                remainingOperations = [];
+                state.clearQueue();
+            }
+            currentOperations.push(operation);
+            state.enqueueOperation(operation);
+        });
+    };
+
+    const clearButton = addButton(topBar, "Reset", () => {
         currentOperations = [];
         remainingOperations = [];
         state.clearQueue();
+        state.setColors(solvedCube);
     });
     const demoButton = addButton(topBar, "Demo", () => {
         currentOperations = [...operations];
@@ -100,40 +117,40 @@ export const createControls = (state) => {
 
     const operationButtons = operations
         .filter(({ category }) => category === "Basic")
-        .map((operation) =>
-            addButton(bottomBar, operation.displayName, () => {
-                if (remainingOperations.length > 0) {
-                    currentOperations = [];
-                    remainingOperations = [];
-                    state.clearQueue();
-                }
-                currentOperations.push(operation);
-                state.enqueueOperation(operation);
-            })
-        );
+        .map((operation) => createOperationButton(bottomBar, operation));
+
+    const extraButtons = operations
+        .filter(({ category }) => category !== "Basic")
+        .map((operation) => createOperationButton(bottomBar, operation));
+
+    const moreOperationsButton = addButton(
+        bottomBar,
+        "More...",
+        () => {
+            extraButtonsHidden = false;
+            updateControls();
+        },
+        "more-less-button"
+    );
+
+    const lessOperationsButton = addButton(
+        bottomBar,
+        "Less...",
+        () => {
+            extraButtonsHidden = true;
+            updateControls();
+        },
+        "more-less-button"
+    );
 
     const updateControls = () => {
-        const isRunning = state.operationQueue.length !== 0;
-        const disabledWhenRunning = [
-            clearButton,
-            demoButton,
-            scrambleButton,
-            solveButton,
-            resumeButton,
-            ...operationButtons,
-        ];
-
-        const disabledWhenNotRunning = [pauseButton];
-        resumeButton.hidden = isRunning || remainingOperations.length === 0;
-        pauseButton.hidden = !isRunning && remainingOperations.length > 0;
+        const isRunning = state.currentAnimation !== null;
+        const hasElementsInQueue = state.operationQueue.length !== 0;
 
         algorithm.innerHTML = "";
         for (var i = 0; i < currentOperations.length; ++i) {
-            if (i !== 0) {
-                algorithm.appendChild(document.createTextNode(" "));
-            }
-
-            const node = document.createElement("span");
+            const node = document.createElement("a");
+            node.classList.add("algorithm-link");
             node.innerText = currentOperations[i].displayName;
 
             const remainingOperationsCount =
@@ -142,21 +159,71 @@ export const createControls = (state) => {
                 currentOperations.length - remainingOperationsCount - 1;
 
             if (isRunning && i == currentPosition) {
-                node.className = "algorithm-current";
+                node.classList.add("algorithm-current");
             } else if (i <= currentPosition) {
-                node.className = "algorithm-done";
+                node.classList.add("algorithm-done");
+            }
+
+            const delta = i - currentPosition;
+            if (delta !== 0 && !isRunning) {
+                node.href = "#";
+                node.onclick = () => {
+                    if (delta > 0) {
+                        const toExecute = currentOperations.slice(
+                            currentPosition + 1,
+                            currentPosition + delta + 1
+                        );
+                        state.setColors(
+                            state.runtime.performAlgorithm(
+                                state.currentCube,
+                                toExecute.map(({ code }) => code)
+                            )
+                        );
+                        remainingOperations.splice(0, delta);
+                    } else {
+                        const toExecute = currentOperations.slice(
+                            currentPosition + delta + 1,
+                            currentPosition + 1
+                        );
+                        state.setColors(
+                            state.runtime.performAlgorithm(
+                                state.currentCube,
+                                state.runtime.invertAlgorithm(
+                                    toExecute.map(({ code }) => code)
+                                )
+                            )
+                        );
+                        remainingOperations.unshift(...toExecute);
+                    }
+                };
             }
             algorithm.appendChild(node);
         }
-        disabledWhenRunning.forEach((button) => {
+
+        [
+            clearButton,
+            demoButton,
+            scrambleButton,
+            resumeButton,
+            ...operationButtons,
+            ...extraButtons,
+        ].forEach((button) => {
             button.disabled = isRunning;
         });
-        disabledWhenNotRunning.forEach((button) => {
-            button.disabled = !isRunning;
+        pauseButton.disabled = !isRunning || !hasElementsInQueue;
+        extraButtons.forEach((button) => {
+            button.hidden = extraButtonsHidden;
         });
+        moreOperationsButton.hidden = !extraButtonsHidden;
+        lessOperationsButton.hidden = extraButtonsHidden;
+        algorithm.hidden = currentOperations.length === 0;
+        resumeButton.hidden = isRunning || remainingOperations.length === 0;
+        pauseButton.hidden = !isRunning && remainingOperations.length > 0;
+        solveButton.disabled =
+            isRunning || state.runtime.isSolved(state.currentCube);
     };
     updateControls();
-    state.addQueueChangeListener(updateControls);
+    state.addChangeListener(updateControls);
 
     target.appendChild(topBar);
     target.appendChild(bottomBar);

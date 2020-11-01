@@ -1,8 +1,17 @@
-import * as THREE from "three";
+import {
+    Mesh,
+    Texture,
+    MeshBasicMaterial,
+    DoubleSide,
+    Group,
+    Scene,
+    PerspectiveCamera,
+    WebGLRenderer,
+} from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 
-import "./index.css";
 import "purecss/build/pure.css";
+import "./index.css";
 
 import { Vector3 } from "three";
 import { createRuntime } from "./runtime";
@@ -92,20 +101,19 @@ const createAnimation = (allCubicles, operation, animationSpeed) => {
     );
 
     return {
+        operation,
         step() {
             if (remaining <= 0) {
                 return;
             }
-
+            const stepFactor = 0.05 * quarterTurns * animationSpeed;
             const theta =
                 (1.1 -
                     Math.pow(
                         (2 * remaining - targetRotation) / targetRotation,
                         2
                     )) *
-                0.07 *
-                quarterTurns *
-                animationSpeed;
+                stepFactor;
             remaining -= theta;
 
             cubicles.forEach((cubicle) => {
@@ -130,12 +138,11 @@ const createAnimation = (allCubicles, operation, animationSpeed) => {
 
 const createCubicle = () => {
     var geometry = createBoxWithRoundedEdges(1, 1, 1, 0.07, 5);
-    var material = new THREE.MeshBasicMaterial({
+    var material = new MeshBasicMaterial({
         color: 0x333333,
         opacity: 1,
     });
-    const cube = new THREE.Mesh(geometry, material);
-    return cube;
+    return new Mesh(geometry, material);
 };
 
 const createFace = (i, j, k, label) => {
@@ -156,7 +163,7 @@ const createFace = (i, j, k, label) => {
         context.textBaseline = "middle";
         context.fillStyle = "black";
         context.fillText(text, canvas.width / 2, canvas.height / 2);
-        var texture = new THREE.Texture(canvas);
+        var texture = new Texture(canvas);
         texture.offset.set(0.5, 0.5);
         texture.needsUpdate = true;
     }
@@ -164,10 +171,10 @@ const createFace = (i, j, k, label) => {
     const geometry = createRoundRect(0.88, 0.88, 0.05);
     geometry.center();
 
-    const material = new THREE.MeshBasicMaterial({
+    const material = new MeshBasicMaterial({
         color: 0x000000,
         map: texture || null,
-        side: THREE.DoubleSide,
+        side: DoubleSide,
         transparent: true,
         depthTest: true,
         depthWrite: false,
@@ -175,7 +182,7 @@ const createFace = (i, j, k, label) => {
         polygonOffsetFactor: -1,
         polygonOffsetUnits: -4,
     });
-    var face = new THREE.Mesh(geometry, material);
+    var face = new Mesh(geometry, material);
 
     // Somewhat arbitrary rotations, but just to ensure that normal is facing outwards
     // everywhere (so text labels show up nicely)
@@ -207,7 +214,7 @@ const createRubiksCube = () => {
     const allFaces = [];
     const allCubicles = [];
 
-    const rubiksCube = new THREE.Group();
+    const rubiksCube = new Group();
     rubiksCube.matrixAutoUpdate = false;
 
     for (var i = -1; i < 2; ++i) {
@@ -270,8 +277,8 @@ async function init() {
     var runtime = await createRuntime();
     window._runtime = runtime;
 
-    var scene = new THREE.Scene();
-    var camera = new THREE.PerspectiveCamera(
+    var scene = new Scene();
+    var camera = new PerspectiveCamera(
         75,
         window.innerWidth / window.innerHeight,
         0.1,
@@ -280,7 +287,7 @@ async function init() {
     camera.position.z = 6;
     scene.add(camera);
 
-    var renderer = new THREE.WebGLRenderer({ antialias: true });
+    var renderer = new WebGLRenderer({ antialias: true });
     renderer.setClearColor(0xf5f2f0);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -306,8 +313,9 @@ async function init() {
         runtime,
         currentCube: [...solvedCube],
         operationQueue: [],
-        queueListeners: [],
+        changeListeners: [],
         animationSpeed: 1,
+        currentAnimation: null,
         checkAndStartRendering() {
             if (!isRendering) {
                 isRendering = true;
@@ -321,46 +329,43 @@ async function init() {
         },
         enqueueOperation(...operations) {
             this.operationQueue.push(...operations);
-            this.queueListeners.forEach((callback) => callback());
+            this.changeListeners.forEach((callback) => callback());
             this.checkAndStartRendering();
         },
         clearQueue() {
             this.operationQueue = [];
-            this.queueListeners.forEach((callback) => callback());
+            this.changeListeners.forEach((callback) => callback());
         },
-        addQueueChangeListener(callback) {
-            this.queueListeners.push(callback);
+        addChangeListener(callback) {
+            this.changeListeners.push(callback);
         },
     };
 
-    var animation = null;
-    var currentOperation = null;
-
     renderFunc = () => {
-        if (currentOperation !== null) {
-            if (animation.finished()) {
-                animation.reset();
+        if (state.currentAnimation !== null) {
+            if (state.currentAnimation.finished()) {
+                state.currentAnimation.reset();
                 state.setColors(
                     runtime.performOperation(
                         state.currentCube,
-                        currentOperation.code
+                        state.currentAnimation.operation.code
                     )
                 );
-                currentOperation = null;
+                state.currentAnimation = null;
             } else {
-                animation.step();
+                state.currentAnimation.step();
             }
         } else if (state.operationQueue.length !== 0) {
-            currentOperation = state.operationQueue.shift();
-            state.queueListeners.forEach((callback) => callback());
-
-            animation = createAnimation(
+            const nextOperation = state.operationQueue.shift();
+            state.currentAnimation = createAnimation(
                 allCubicles,
-                currentOperation,
+                nextOperation,
                 state.animationSpeed
             );
+            state.changeListeners.forEach((callback) => callback());
         } else {
             isRendering = false;
+            state.changeListeners.forEach((callback) => callback());
         }
         if (isRendering) {
             window.requestAnimationFrame(renderFunc);
