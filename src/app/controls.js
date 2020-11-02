@@ -1,5 +1,5 @@
 import { operations, solvedCube } from "./constants";
-import githubLogo from "../static/github.png";
+import githubLogo from "../../static/github.png";
 
 const addButton = (parent, label, onClick, className) => {
     var button = document.createElement("button");
@@ -17,6 +17,7 @@ const addGithubLink = (parent) => {
     var link = document.createElement("a");
     link.href = "https://github.com/tibordp/neishauben";
     link.target = "_blank";
+    link.rel = "noopener";
     var img = document.createElement("img");
     img.className = "github-link";
     img.src = githubLogo;
@@ -60,6 +61,7 @@ export const createControls = (state) => {
     var currentOperations = [];
     var remainingOperations = [];
     var extraButtonsHidden = true;
+    var runtime = null;
 
     const createOperationButton = (parent, operation) => {
         return addButton(parent, operation.displayName, () => {
@@ -92,18 +94,22 @@ export const createControls = (state) => {
         state.enqueueOperation(...remainingOperations);
         remainingOperations = [];
     });
-    const scrambleButton = addButton(topBar, "Scramble", () => {
+    const scrambleButton = addButton(topBar, "Scramble", async () => {
+        const scramble = await runtime.generateScramble(25, false);
+
         remainingOperations = [];
-        currentOperations = state.runtime
-            .scramble(25)
-            .map((c) => operations.find(({ code }) => code === c));
+        currentOperations = scramble.map((c) =>
+            operations.find(({ code }) => code === c)
+        );
         state.enqueueOperation(...currentOperations);
     });
-    const solveButton = addButton(topBar, "Solve", () => {
+    const solveButton = addButton(topBar, "Solve", async () => {
+        const solveAlgorithm = await runtime.solve(state.currentCube);
+
         remainingOperations = [];
-        currentOperations = state.runtime
-            .solve(state.currentCube)
-            .map((c) => operations.find(({ code }) => code === c));
+        currentOperations = solveAlgorithm.map((c) =>
+            operations.find(({ code }) => code === c)
+        );
         state.enqueueOperation(...currentOperations);
     });
     addSlider(topBar, "Animation speed", (speed) => {
@@ -143,61 +149,64 @@ export const createControls = (state) => {
         "more-less-button"
     );
 
-    const updateControls = () => {
+    const updateControls = async () => {
         const isRunning = state.currentAnimation !== null;
         const hasElementsInQueue = state.operationQueue.length !== 0;
 
-        algorithm.innerHTML = "";
-        for (var i = 0; i < currentOperations.length; ++i) {
-            const node = document.createElement("a");
-            node.classList.add("algorithm-link");
-            node.innerText = currentOperations[i].displayName;
+        if (runtime) {
+            algorithm.innerHTML = "";
+            for (var i = 0; i < currentOperations.length; ++i) {
+                const node = document.createElement("a");
+                node.classList.add("algorithm-link");
+                node.innerText = currentOperations[i].displayName;
 
-            const remainingOperationsCount =
-                state.operationQueue.length + remainingOperations.length;
-            const currentPosition =
-                currentOperations.length - remainingOperationsCount - 1;
+                const remainingOperationsCount =
+                    state.operationQueue.length + remainingOperations.length;
+                const currentPosition =
+                    currentOperations.length - remainingOperationsCount - 1;
 
-            if (isRunning && i == currentPosition) {
-                node.classList.add("algorithm-current");
-            } else if (i <= currentPosition) {
-                node.classList.add("algorithm-done");
-            }
+                if (isRunning && i == currentPosition) {
+                    node.classList.add("algorithm-current");
+                } else if (i <= currentPosition) {
+                    node.classList.add("algorithm-done");
+                }
 
-            const delta = i - currentPosition;
-            if (delta !== 0 && !isRunning) {
-                node.href = "#";
-                node.onclick = () => {
-                    if (delta > 0) {
-                        const toExecute = currentOperations.slice(
-                            currentPosition + 1,
-                            currentPosition + delta + 1
-                        );
-                        state.setColors(
-                            state.runtime.performAlgorithm(
-                                state.currentCube,
-                                toExecute.map(({ code }) => code)
-                            )
-                        );
-                        remainingOperations.splice(0, delta);
-                    } else {
-                        const toExecute = currentOperations.slice(
-                            currentPosition + delta + 1,
-                            currentPosition + 1
-                        );
-                        state.setColors(
-                            state.runtime.performAlgorithm(
-                                state.currentCube,
-                                state.runtime.invertAlgorithm(
+                const delta = i - currentPosition;
+                if (delta !== 0 && !isRunning) {
+                    node.href = "#";
+                    node.onclick = async () => {
+                        if (delta > 0) {
+                            const toExecute = currentOperations.slice(
+                                currentPosition + 1,
+                                currentPosition + delta + 1
+                            );
+                            remainingOperations.splice(0, delta);
+
+                            state.setColors(
+                                await runtime.performAlgorithm(
+                                    state.currentCube,
                                     toExecute.map(({ code }) => code)
                                 )
-                            )
-                        );
-                        remainingOperations.unshift(...toExecute);
-                    }
-                };
+                            );
+                        } else {
+                            const toExecute = currentOperations.slice(
+                                currentPosition + delta + 1,
+                                currentPosition + 1
+                            );
+                            remainingOperations.unshift(...toExecute);
+                            state.setColors(
+                                await runtime.performAlgorithm(
+                                    state.currentCube,
+                                    await runtime.invertAlgorithm(
+                                        toExecute.map(({ code }) => code)
+                                    )
+                                )
+                            );
+                        }
+                    };
+                }
+                algorithm.appendChild(node);
             }
-            algorithm.appendChild(node);
         }
 
         [
@@ -208,9 +217,9 @@ export const createControls = (state) => {
             ...operationButtons,
             ...extraButtons,
         ].forEach((button) => {
-            button.disabled = isRunning;
+            button.disabled = isRunning || !runtime;
         });
-        pauseButton.disabled = !isRunning || !hasElementsInQueue;
+        pauseButton.disabled = !isRunning || !hasElementsInQueue || !runtime;
         extraButtons.forEach((button) => {
             button.hidden = extraButtonsHidden;
         });
@@ -220,10 +229,17 @@ export const createControls = (state) => {
         resumeButton.hidden = isRunning || remainingOperations.length === 0;
         pauseButton.hidden = !isRunning && remainingOperations.length > 0;
         solveButton.disabled =
-            isRunning || state.runtime.isSolved(state.currentCube);
+            isRunning ||
+            !runtime ||
+            (await runtime.isSolved(state.currentCube));
     };
     updateControls();
+
     state.addChangeListener(updateControls);
+    state.runtimePromise.then(([result]) => {
+        runtime = result;
+        updateControls();
+    });
 
     target.appendChild(topBar);
     target.appendChild(bottomBar);

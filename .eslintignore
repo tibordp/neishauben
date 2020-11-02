@@ -1,2 +1,1 @@
-src/rubiks.wasm
-src/rubiks.js
+build/**

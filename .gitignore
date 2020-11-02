@@ -1,6 +1,4 @@
-**/rubiks.wasm
-**/rubiks.wasm.map
-**/rubiks.js
+build/
 dist/
 node_modules/
 .vscode/
