@@ -1,12 +1,16 @@
-#include <emscripten.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
-#define OPT_LOOKUP_LENGTH 3
-#define OPT_LOOKUP_SIZE 19 * 19 * 19
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#else
+#define EMSCRIPTEN_KEEPALIVE
+#endif
+
+#include "src/runtime/rubiks.h"
 
 typedef struct var {
   char sides[6][9];
@@ -41,27 +45,12 @@ char sp_corner_transform[4] = {0, 2, 8, 6};
 
 int record_algorithm[512];
 int record_count = 0;
+
+#ifdef OPT_CODEGEN
+#include "build/optimizations.h"
+#else
 int optimizations_lookup[OPT_LOOKUP_SIZE];
-
-int cube_optimize_pack_tuple(int *index) {
-  int cnt, value = 0;
-  for (cnt = 0; cnt < OPT_LOOKUP_LENGTH; ++cnt) {
-    value = value * 19 + (index[cnt] < 12 ? index[cnt] : index[cnt] - 12) + 1;
-  }
-  return value;
-}
-
-int cube_optimize_unpack_tuple(int value, int *index) {
-  int len = 0;
-  int cnt;
-  for (cnt = OPT_LOOKUP_LENGTH - 1; cnt >= 0; --cnt) {
-    len += value > 0;
-    index[cnt] = value % 19 - 1;
-    index[cnt] = index[cnt] < 12 ? index[cnt] : index[cnt] + 12;
-    value /= 19;
-  }
-  return len;
-}
+#endif
 
 int cube_inverse(int operation) {
   if ((operation >= 0 && operation < 24) || (operation >= 30 && operation < 42)) {
@@ -372,7 +361,7 @@ void cube_perform(cube *src_c, int operation) {
     cube_perform_rotate_cube(src_c, (operation - 45) * 2);
   }
   // f2, b2, u2, d2, l2, r2
-  else if (operation >= 48 && operation < 54) {
+  else if (operation >= 48 && operation < OPERATION_COUNT) {
     int face_num = operation - 48;
     cube_perform_rotate((*src_c).sides[face_num], 2);
     for (cnt = 0; cnt < 4; cnt++) {
@@ -1201,6 +1190,25 @@ void cube_ll_permute_edges(cube *source) {
   }
 }
 
+int cube_optimize_pack_tuple(int *index) {
+  int cnt, value = 0;
+  for (cnt = 0; cnt < OPT_LOOKUP_LENGTH; ++cnt) {
+    value = value * (OPERATION_COUNT + 1) + (index[cnt] + 1);
+  }
+  return value;
+}
+
+int cube_optimize_unpack_tuple(int value, int *index) {
+  int len = 0;
+  int cnt;
+  for (cnt = OPT_LOOKUP_LENGTH - 1; cnt >= 0; --cnt) {
+    len += value > 0;
+    index[cnt] = value % (OPERATION_COUNT + 1) - 1;
+    value /= (OPERATION_COUNT + 1);
+  }
+  return len;
+}
+
 int *cube_optimize_apply(int *pos, int packed) {
   int step[OPT_LOOKUP_LENGTH];
   int len = cube_optimize_unpack_tuple(packed, step);
@@ -1222,8 +1230,11 @@ int cube_optimize_algorithm(int *alg, int count) {
     for (int i = 0; i < OPT_LOOKUP_LENGTH; ++i) {
       buf[i] = offset < i + 1 ? head[i - OPT_LOOKUP_LENGTH + 1] : -1;
     }
-    int packed = cube_optimize_pack_tuple(buf);
-    head = cube_optimize_apply(head + offset, optimizations_lookup[packed]) + 1;
+    if ((packed = cube_optimize_pack_tuple(buf)) != -1) {
+      head = cube_optimize_apply(head + offset, optimizations_lookup[packed]) + 1;
+    } else {
+      head++;
+    }
   }
   *head = -1;
   return head - alg;
@@ -1289,9 +1300,29 @@ void cube_read(cube *cube, char *cube_data) {
   }
 }
 
+void cube_scramble(int *alg, int depth, int only_basic) {
+  int packed;
+  int offset;
+  int *head = &alg[0];
+  int buf[OPT_LOOKUP_LENGTH];
+  while (head - alg < depth) {
+    *head = rand() % (only_basic ? 12 : OPERATION_COUNT);
+    offset = head - alg < OPT_LOOKUP_LENGTH - 1 ? OPT_LOOKUP_LENGTH - (head - alg) - 1 : 0;
+    for (int i = 0; i < OPT_LOOKUP_LENGTH; ++i) {
+      buf[i] = offset < i + 1 ? head[i - OPT_LOOKUP_LENGTH + 1] : -1;
+    }
+    if ((packed = cube_optimize_pack_tuple(buf)) != -1) {
+      head = cube_optimize_apply(head + offset, optimizations_lookup[packed]) + 1;
+    } else {
+      head++;
+    }
+  }
+}
+
+#ifndef OPT_CODEGEN
 void cube_populate_optimizations() {
   int i, j, k, op_num, upper_range;
-  cube cubes[OPT_LOOKUP_SIZE];
+  cube *cubes = (cube *)malloc(OPT_LOOKUP_SIZE * sizeof(cube));
   int index[OPT_LOOKUP_LENGTH];
   for (op_num = 0; op_num < OPT_LOOKUP_SIZE; ++op_num) {
     cube_optimize_unpack_tuple(op_num, index);
@@ -1301,8 +1332,7 @@ void cube_populate_optimizations() {
     }
   }
 
-  upper_range = OPT_LOOKUP_SIZE / 19;
-  ;
+  upper_range = OPT_LOOKUP_SIZE / (OPERATION_COUNT + 1);
   for (i = OPT_LOOKUP_SIZE - 1; i >= 0; --i) {
     optimizations_lookup[i] = i;
     // only consider shorter sequences for optimization
@@ -1312,32 +1342,20 @@ void cube_populate_optimizations() {
       }
     }
     if (i == upper_range) {
-      upper_range /= 19;
+      upper_range /= (OPERATION_COUNT + 1);
     }
   }
+  free(cubes);
 }
-
-void cube_scramble(int *alg, int depth) {
-  int packed;
-  int offset;
-  int *head = &alg[0];
-  int buf[OPT_LOOKUP_LENGTH];
-  while (head - alg < depth) {
-    *head = rand() % 12;
-    offset = head - alg < OPT_LOOKUP_LENGTH - 1 ? OPT_LOOKUP_LENGTH - (head - alg) - 1 : 0;
-    for (int i = 0; i < OPT_LOOKUP_LENGTH; ++i) {
-      buf[i] = offset < i + 1 ? head[i - OPT_LOOKUP_LENGTH + 1] : -1;
-    }
-    int packed = cube_optimize_pack_tuple(buf);
-    head = cube_optimize_apply(head + offset, optimizations_lookup[packed]) + 1;
-  }
-}
+#endif
 
 EMSCRIPTEN_KEEPALIVE
 void init() {
   srand(time(NULL));
   cube_init();
+#ifndef OPT_CODEGEN
   cube_populate_optimizations();
+#endif
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -1349,7 +1367,7 @@ void perform(char *cube_data, int operation) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-void recolor(char *cube_data) {
+void reorient_cube(char *cube_data) {
   cube c_main;
   cube_read(&c_main, cube_data);
   cube_recolor(&c_main);
@@ -1357,7 +1375,7 @@ void recolor(char *cube_data) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-void scramble(int *alg, int depth) { cube_scramble(alg, depth); }
+void generate_scramble(int *alg, int depth, int only_basic) { cube_scramble(alg, depth, only_basic); }
 
 EMSCRIPTEN_KEEPALIVE
 void invert_algorithm(int *alg, int length) {
@@ -1373,22 +1391,13 @@ void invert_algorithm(int *alg, int length) {
 }
 
 EMSCRIPTEN_KEEPALIVE
+int optimize_algorithm(int *alg, int length) { return cube_optimize_algorithm(alg, length); }
+
+EMSCRIPTEN_KEEPALIVE
 void perform_algorithm(char *cube_data, int *alg, int count) {
   cube c_main;
   cube_read(&c_main, cube_data);
   for (int i = 0; i < count; ++i) {
-    cube_perform(&c_main, alg[i]);
-  }
-  cube_out(&c_main, cube_data);
-}
-
-EMSCRIPTEN_KEEPALIVE
-void scrambled_cube(char *cube_data, char depth) {
-  cube c_main;
-  int alg[depth];
-  cube_default(&c_main);
-  cube_scramble(alg, depth);
-  for (int i = 0; i < depth; ++i) {
     cube_perform(&c_main, alg[i]);
   }
   cube_out(&c_main, cube_data);

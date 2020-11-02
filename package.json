@@ -1,42 +1,48 @@
 {
-  "name": "neishauben",
-  "license": "MIT",
-  "private": true,
-  "version": "0.0.1",
-  "scripts": {
-    "emcc": "docker run --rm -v $(pwd):/src emscripten/emsdk emcc -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='[\"cwrap\",\"getValue\",\"setValue\"]' -s EXPORT_NAME=\"rubiks\"",
-    "wasm:dev": "yarn emcc -g -O0 -s ENVIRONMENT=web -s MODULARIZE=1 -o ./src/rubiks.js ./src/rubiks.c",
-    "wasm:production": "yarn emcc -O3 -s ENVIRONMENT=web -s MODULARIZE=1 -o ./src/rubiks.js ./src/rubiks.c",
-    "wasm:node:dev": "yarn emcc -g -O0 -s ENVIRONMENT=node -o ./src/rubiks.js ./src/rubiks.c",
-    "wasm:node:production": "yarn emcc -O3 -s ENVIRONMENT=node -o ./src/rubiks.js ./src/rubiks.c",
-    "build": "yarn wasm:production && webpack",
-    "test": "yarn wasm:node:dev && jest --watch",
-    "test:ci": "yarn wasm:node:dev && jest --ci",
-    "dev": "yarn wasm:dev && webpack --mode=development serve",
-    "lint": "eslint src/",
-    "fmt": "eslint --fix src/",
-    "fmt:c": "clang-format -i -style='{ColumnLimit: 120}' src/rubiks.c"
-  },
-  "devDependencies": {
-    "clean-webpack-plugin": "^3.0.0",
-    "css-loader": "^5.0.0",
-    "eslint": "^7.12.1",
-    "eslint-config-prettier": "^6.14.0",
-    "eslint-plugin-jest": "^24.1.0",
-    "eslint-plugin-prettier": "^3.1.4",
-    "favicons-webpack-plugin": "^4.2.0",
-    "file-loader": "^6.1.1",
-    "html-webpack-plugin": "^4.5.0",
-    "jest": "^26.6.1",
-    "prettier": "^2.1.2",
-    "style-loader": "^2.0.0",
-    "webpack": "^4.44.2",
-    "webpack-cli": "^4.1.0",
-    "webpack-dev-server": "^3.11.0",
-    "workbox-webpack-plugin": "^5.1.4"
-  },
-  "dependencies": {
-    "purecss": "^2.0.3",
-    "three": "^0.121.1"
-  }
+    "name": "neishauben",
+    "license": "MIT",
+    "private": true,
+    "version": "0.0.1",
+    "scripts": {
+        "emcc": "mkdir -p build && docker run --rm -v $(pwd):/src emscripten/emsdk emcc -I . -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='[\"cwrap\",\"getValue\",\"setValue\"]' -s EXPORT_NAME=\"rubiks\"",
+        "wasm:dev": "yarn emcc -g -O0 -s MODULARIZE=1 -o ./build/rubiks.js ./src/runtime/rubiks.c",
+        "wasm:production": "yarn codegen && yarn emcc -O3 -DPRODUCTION -DOPT_CODEGEN -s MODULARIZE=1 -o ./build/rubiks.js ./src/runtime/rubiks.c",
+        "codegen": "yarn emcc -O3 -DPRODUCTION -o ./build/codegen.js ./src/runtime/codegen.c ./src/runtime/rubiks.c && node ./build/codegen.js > ./build/optimizations.h",
+        "build": "yarn wasm:production && webpack",
+        "serve": "ws --compress -d dist/ --index.root neishauben/ --rewrite '/neishauben/(.*) -> /$1'",
+        "test": "jest --watch",
+        "test:ci": "jest --ci",
+        "dev": "webpack --mode=development serve",
+        "lint": "eslint src/",
+        "fmt": "eslint --fix src/",
+        "fmt:c": "clang-format -i -style='{ColumnLimit: 120}' src/runtime/*.h src/runtime/*.c"
+    },
+    "devDependencies": {
+        "@babel/core": "^7.12.3",
+        "@babel/preset-env": "^7.12.1",
+        "babel-jest": "^26.6.1",
+        "clean-webpack-plugin": "^3.0.0",
+        "css-loader": "^5.0.0",
+        "eslint": "^7.12.1",
+        "eslint-config-prettier": "^6.14.0",
+        "eslint-plugin-jest": "^24.1.0",
+        "eslint-plugin-prettier": "^3.1.4",
+        "favicons-webpack-plugin": "^4.2.0",
+        "file-loader": "^6.1.1",
+        "html-webpack-plugin": "^4.5.0",
+        "jest": "^26.6.1",
+        "jest-file-loader": "^1.0.1",
+        "local-web-server": "^4.2.1",
+        "prettier": "^2.1.2",
+        "style-loader": "^2.0.0",
+        "webpack": "^4.44.2",
+        "webpack-cli": "^4.1.0",
+        "webpack-dev-server": "^3.11.0",
+        "workbox-webpack-plugin": "^5.1.4"
+    },
+    "dependencies": {
+        "purecss": "^2.0.3",
+        "three": "^0.121.1",
+        "worker-loader": "^3.0.5"
+    }
 }
