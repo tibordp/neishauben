@@ -95,7 +95,7 @@ export const createControls = (state) => {
         remainingOperations = [];
     });
     const scrambleButton = addButton(topBar, "Scramble", async () => {
-        const scramble = await runtime.generateScramble(25, false);
+        const scramble = await runtime.generateScramble(25, true);
 
         remainingOperations = [];
         currentOperations = scramble.map((c) =>
