@@ -6,6 +6,7 @@ const FaviconsWebpackPlugin = require("favicons-webpack-plugin");
 const WorkboxPlugin = require("workbox-webpack-plugin");
 
 module.exports = {
+    mode: "development",
     context: path.resolve(__dirname, "."),
     entry: "./src/index.js",
     output: {
@@ -13,9 +14,16 @@ module.exports = {
         filename: "[name].[contenthash:8].js",
         publicPath: "/neishauben/",
     },
+    resolve: {
+        fallback: {
+            "path": false
+        }
+    },
     devtool: "source-map",
     plugins: [
-        new IgnorePlugin(/fs/),
+        new IgnorePlugin({
+            resourceRegExp: /fs/
+        }),
         new CleanWebpackPlugin(),
         new FaviconsWebpackPlugin({
             logo: "./static/logo.png",
@@ -74,7 +82,8 @@ module.exports = {
         ],
     },
     devServer: {
-        contentBase: path.join(__dirname, "dist"),
-        publicPath: "/neishauben/",
+        static: {
+            directory: path.join(__dirname, "dist")
+        }
     },
 };
