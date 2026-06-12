@@ -1,15 +1,9 @@
-import rubiks from "../../build/rubiks.js";
-import rubiksModule from "../../build/rubiks.wasm";
+import rubiks from "../../build/rubiks.mjs";
 
 export const createRuntime = async () => {
-    const runtime = await rubiks({
-        locateFile(path) {
-            if (path.endsWith(".wasm")) {
-                return rubiksModule;
-            }
-            return path;
-        },
-    });
+    // The Emscripten-generated ES module locates rubiks.wasm itself
+    // relative to import.meta.url, both in the browser and in Node.
+    const runtime = await rubiks();
 
     // Initialize the transformation and optimization tables
     runtime._init();

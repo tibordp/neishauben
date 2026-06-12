@@ -2,7 +2,12 @@
 <html lang="en-US">
   <head>
     <meta charset="utf-8">
-    <title><%= htmlWebpackPlugin.options.title %></title>
+    <title>Neishauben</title>
+    <meta name="description" content="Rubik's Cube Simulator">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#3484d5">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <style>
         body {
             background-color: #f5f2f0;
@@ -27,14 +32,6 @@
             transform: translateZ(100);
             animation: load8 1.1s infinite linear;
         }
-        @-webkit-keyframes load8 {
-            0% {
-                transform: translate(-50%, -50%) rotate(0deg);
-            }
-            100% {
-                transform: translate(-50%, -50%)  rotate(360deg);
-            }
-        }
         @keyframes load8 {
             0% {
                 transform: translate(-50%, -50%) rotate(0deg);
@@ -47,5 +44,6 @@
   </head>
   <body>
     <div id="spinner">Loading...</div>
+    <script type="module" src="/src/index.js"></script>
   </body>
 </html>

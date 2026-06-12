@@ -1,4 +1,4 @@
-import { expect, test } from "@jest/globals";
+import { beforeAll, expect, test } from "vitest";
 import { solvedCube as SOLVED_CUBE } from "./constants";
 import { createRuntime } from "./runtime.js";
 import { printAlgorithm, parseAlgorithm } from "./cubeUtils";

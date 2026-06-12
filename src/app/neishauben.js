@@ -1,6 +1,7 @@
 import {
     Mesh,
-    Texture,
+    CanvasTexture,
+    SRGBColorSpace,
     MeshBasicMaterial,
     DoubleSide,
     Group,
@@ -8,7 +9,7 @@ import {
     PerspectiveCamera,
     WebGLRenderer,
 } from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import "purecss/build/pure.css";
 import "../styles/neishauben.css";
@@ -163,9 +164,9 @@ const createFace = (i, j, k, label) => {
         context.textBaseline = "middle";
         context.fillStyle = "black";
         context.fillText(text, canvas.width / 2, canvas.height / 2);
-        var texture = new Texture(canvas);
+        var texture = new CanvasTexture(canvas);
+        texture.colorSpace = SRGBColorSpace;
         texture.offset.set(0.5, 0.5);
-        texture.needsUpdate = true;
     }
 
     const geometry = createRoundRect(0.88, 0.88, 0.05);
@@ -296,7 +297,6 @@ export const initializeNeishauben = async () => {
     controls.enableDamping = true;
     controls.dampingFactor = 0.25;
     controls.enableZoom = true;
-    controls.enableKeys = false;
     controls.enablePan = false;
     controls.minDistance = 4;
     controls.maxDistance = 8;

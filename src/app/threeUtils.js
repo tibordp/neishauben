@@ -1,4 +1,4 @@
-import { Shape, ExtrudeBufferGeometry, ShapeBufferGeometry } from "three";
+import { Shape, ExtrudeGeometry, ShapeGeometry } from "three";
 
 export function createBoxWithRoundedEdges(
     width,
@@ -21,7 +21,7 @@ export function createBoxWithRoundedEdges(
         true
     );
     shape.absarc(width - radius * 2, eps, eps, 0, -Math.PI / 2, true);
-    let geometry = new ExtrudeBufferGeometry(shape, {
+    let geometry = new ExtrudeGeometry(shape, {
         depth: depth - radius0 * 2,
         bevelEnabled: true,
         bevelSegments: smoothness * 2,
@@ -77,7 +77,7 @@ export function createRoundRect(width, height, radius) {
         -Math.PI / 2,
         true
     );
-    const geometry = new ShapeBufferGeometry(shape, 5);
+    const geometry = new ShapeGeometry(shape, 5);
     geometry.center();
     return geometry;
 }

@@ -1,8 +1,9 @@
-import RuntimeWorker from "./runtime.worker.js";
-
 export const createWorkerRuntime = () => {
     return new Promise((mainResolve) => {
-        const worker = new RuntimeWorker();
+        const worker = new Worker(
+            new URL("./runtime.worker.js", import.meta.url),
+            { type: "module" }
+        );
 
         var index = 0;
         const promises = {};
