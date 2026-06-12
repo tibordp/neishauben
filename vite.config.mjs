@@ -3,6 +3,14 @@ import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
     base: "/neishauben/",
+    // Allow access via mDNS (<hostname>.local) when testing on other
+    // devices with `pnpm dev --host` / `pnpm preview --host`.
+    server: {
+        allowedHosts: [".local"],
+    },
+    preview: {
+        allowedHosts: [".local"],
+    },
     worker: {
         format: "es",
     },

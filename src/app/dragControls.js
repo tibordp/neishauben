@@ -26,6 +26,17 @@ const resetCubicle = (cubicle) => {
     cubicle.updateMatrix();
 };
 
+const dominantAxis = (vector) => {
+    const components = [vector.x, vector.y, vector.z];
+    var index = 0;
+    for (var i = 1; i < 3; ++i) {
+        if (Math.abs(components[i]) > Math.abs(components[index])) {
+            index = i;
+        }
+    }
+    return AXES[index].clone().multiplyScalar(Math.sign(components[index]));
+};
+
 const planeCenter = (operation) =>
     new Vector3(...planePermutations[operation.plane].center);
 
@@ -73,6 +84,15 @@ export const createDragControls = (
     });
 
     var drag = null;
+    // All pointers currently down on the canvas, including ones owned by
+    // OrbitControls. Every pointer that goes down on the canvas is captured
+    // by either us or OrbitControls, so its up/cancel always reaches us.
+    const activePointers = new Set();
+
+    const extraPointers = () =>
+        drag === null
+            ? 0
+            : [...activePointers].filter((id) => id !== drag.pointerId).length;
 
     const pointerRay = (event) => {
         const rect = domElement.getBoundingClientRect();
@@ -147,6 +167,29 @@ export const createDragControls = (
         drag.locked = true;
     };
 
+    // The wide modifier (Shift on desktop, a second finger on touch) can
+    // change while the twist is in flight; like axis switching, honoring
+    // it is only allowed within the grace angle.
+    const updateWide = (wide) => {
+        if (drag === null || wide === drag.wide) {
+            return;
+        }
+        if (!drag.locked) {
+            drag.wide = wide;
+            return;
+        }
+        if (Math.abs(drag.theta) >= GRACE_ANGLE) {
+            return;
+        }
+        const theta = drag.theta;
+        drag.cubicles.forEach(resetCubicle);
+        drag.wide = wide;
+        applyAxis({ axis: drag.axis, index: drag.axisIndex });
+        rotateLayer(drag.cubicles, drag.axis, theta);
+        drag.theta = theta;
+        state.checkAndStartRendering();
+    };
+
     const createSnapAnimation = (finishedDrag, quarterTurns, operation) => {
         const { cubicles, axis } = finishedDrag;
         const target = quarterTurns * HALF_PI;
@@ -174,13 +217,16 @@ export const createDragControls = (
     };
 
     const onPointerDown = (event) => {
+        const hadOtherPointers = activePointers.size > 0;
+        activePointers.add(event.pointerId);
         if (event.pointerType === "mouse" && event.button !== 0) {
             return;
         }
         if (drag !== null) {
-            // A twist is in progress; don't let a second pointer start
-            // orbiting the camera underneath it.
+            // A twist is in progress; the extra pointer acts as the wide
+            // modifier instead of orbiting the camera underneath it.
             event.stopImmediatePropagation();
+            updateWide(event.shiftKey || extraPointers() > 0);
             return;
         }
         if (
@@ -190,20 +236,40 @@ export const createDragControls = (
         ) {
             return;
         }
+        if (hadOtherPointers) {
+            // OrbitControls owns a pointer already (an orbit gesture is in
+            // flight); leave this one to it as well so pinch-zoom works,
+            // even if it lands on the cube.
+            return;
+        }
         pointerRay(event);
-        const hits = raycaster.intersectObjects(allFaces, false);
+        // Raycast the cubicle bodies along with the stickers, so that the
+        // black plastic occludes stickers on the far side of the cube.
+        const hits = raycaster.intersectObjects(allCubicles, true);
         if (hits.length === 0) {
             // Not on the cube - leave the event to OrbitControls.
             return;
         }
         const hit = hits[0];
-        const normal = new Vector3(...hit.object.userData);
+        var cubicle, normal;
+        if (allCubicles.includes(hit.object)) {
+            // Grabbed the black plastic: treat it as grabbing the cubicle
+            // face it belongs to. The cube is at rest (cubicles have
+            // identity rotation), so the geometry normal is already in
+            // world orientation; snap it to the nearest cube axis since
+            // the hit may be on a rounded edge.
+            cubicle = hit.object;
+            normal = dominantAxis(hit.face.normal);
+        } else {
+            cubicle = hit.object.parent;
+            normal = new Vector3(...hit.object.userData);
+        }
         dragPlane.setFromNormalAndCoplanarPoint(normal, hit.point);
         drag = {
             pointerId: event.pointerId,
             startPoint: hit.point.clone(),
             normal,
-            cubicleCoords: hit.object.parent.userData,
+            cubicleCoords: cubicle.userData,
             wide: event.shiftKey,
             locked: false,
             theta: 0,
@@ -225,6 +291,7 @@ export const createDragControls = (
         if (point === null) {
             return;
         }
+        updateWide(event.shiftKey || extraPointers() > 0);
         const movement = point.clone().sub(drag.startPoint);
         if (!drag.locked) {
             if (movement.length() < LOCK_THRESHOLD) {
@@ -262,7 +329,12 @@ export const createDragControls = (
     };
 
     const onPointerUp = (event) => {
+        activePointers.delete(event.pointerId);
         if (drag === null || event.pointerId !== drag.pointerId) {
+            if (drag !== null) {
+                // The wide-modifier finger was lifted.
+                updateWide(event.shiftKey || extraPointers() > 0);
+            }
             return;
         }
         if (domElement.hasPointerCapture(event.pointerId)) {
