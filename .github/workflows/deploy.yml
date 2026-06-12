@@ -3,11 +3,21 @@ on:
     push:
         branches: [master]
 
+# Allow only one deployment at a time, but let in-progress builds finish.
+concurrency:
+    group: github-pages
+    cancel-in-progress: false
+
 jobs:
     build-and-deploy:
         runs-on: ubuntu-latest
         permissions:
-            contents: write
+            contents: read
+            pages: write
+            id-token: write
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
         steps:
             - name: Checkout
               uses: actions/checkout@v4
@@ -36,9 +46,11 @@ jobs:
             - name: Production build
               run: pnpm exec vite build
 
-            - name: Deploy
-              uses: JamesIves/github-pages-deploy-action@v4
+            - name: Upload Pages artifact
+              uses: actions/upload-pages-artifact@v3
               with:
-                  branch: gh-pages
-                  folder: dist
-                  clean: true
+                  path: dist
+
+            - name: Deploy to GitHub Pages
+              id: deployment
+              uses: actions/deploy-pages@v4
