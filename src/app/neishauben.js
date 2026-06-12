@@ -28,6 +28,7 @@ import {
     planePermutations,
 } from "./constants";
 import { createControls } from "./controls";
+import { createDragControls } from "./dragControls";
 
 const getRank = (i, j, k) => {
     return Math.abs(i) + Math.abs(j) + Math.abs(k);
@@ -293,15 +294,6 @@ export const initializeNeishauben = async () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.25;
-    controls.enableZoom = true;
-    controls.enablePan = false;
-    controls.minDistance = 4;
-    controls.maxDistance = 8;
-    controls.update();
-
     const [rubiksCube, allCubicles, allFaces] = createRubiksCube();
     scene.add(rubiksCube);
 
@@ -315,11 +307,15 @@ export const initializeNeishauben = async () => {
         changeListeners: [],
         animationSpeed: 1,
         currentAnimation: null,
+        isDragging: false,
         checkAndStartRendering() {
             if (!isRendering) {
                 isRendering = true;
                 window.requestAnimationFrame(renderFunc);
             }
+        },
+        notifyChange() {
+            this.changeListeners.forEach((callback) => callback());
         },
         setColors(cubeData) {
             this.currentCube = cubeData;
@@ -328,29 +324,54 @@ export const initializeNeishauben = async () => {
         },
         enqueueOperation(...operations) {
             this.operationQueue.push(...operations);
-            this.changeListeners.forEach((callback) => callback());
+            this.notifyChange();
             this.checkAndStartRendering();
         },
         clearQueue() {
             this.operationQueue = [];
-            this.changeListeners.forEach((callback) => callback());
+            this.notifyChange();
         },
         addChangeListener(callback) {
             this.changeListeners.push(callback);
         },
     };
 
+    // Drag-to-twist handlers must be registered before OrbitControls is
+    // constructed: a pointerdown that grabs a cube face claims the event
+    // with stopImmediatePropagation() so the camera does not orbit.
+    createDragControls(
+        renderer.domElement,
+        camera,
+        allCubicles,
+        allFaces,
+        state
+    );
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.25;
+    controls.enableZoom = true;
+    controls.enablePan = false;
+    controls.minDistance = 4;
+    controls.maxDistance = 8;
+    controls.update();
+
     renderFunc = async () => {
         if (state.currentAnimation !== null) {
             if (state.currentAnimation.finished()) {
-                const [runtime] = await runtimePromise;
+                // A drag that snapped back to its starting position has no
+                // operation to apply to the cube state.
+                const { operation } = state.currentAnimation;
                 state.currentAnimation.reset();
-                state.setColors(
-                    await runtime.performOperation(
-                        state.currentCube,
-                        state.currentAnimation.operation.code
-                    )
-                );
+                if (operation) {
+                    const [runtime] = await runtimePromise;
+                    state.setColors(
+                        await runtime.performOperation(
+                            state.currentCube,
+                            operation.code
+                        )
+                    );
+                }
                 state.currentAnimation = null;
             } else {
                 state.currentAnimation.step();
@@ -362,10 +383,10 @@ export const initializeNeishauben = async () => {
                 nextOperation,
                 state.animationSpeed
             );
-            state.changeListeners.forEach((callback) => callback());
+            state.notifyChange();
         } else {
             isRendering = false;
-            state.changeListeners.forEach((callback) => callback());
+            state.notifyChange();
         }
         if (isRendering) {
             window.requestAnimationFrame(renderFunc);

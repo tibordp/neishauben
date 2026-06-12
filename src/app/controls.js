@@ -75,6 +75,18 @@ export const createControls = (state) => {
         });
     };
 
+    // Called for operations performed by direct manipulation (drag-to-twist).
+    // The animation has already happened on screen, so the operation is only
+    // recorded in the algorithm view, not enqueued.
+    state.recordManualOperation = (operation) => {
+        if (remainingOperations.length > 0) {
+            currentOperations = [];
+            remainingOperations = [];
+            state.clearQueue();
+        }
+        currentOperations.push(operation);
+    };
+
     const clearButton = addButton(topBar, "Reset", () => {
         currentOperations = [];
         remainingOperations = [];
@@ -151,6 +163,7 @@ export const createControls = (state) => {
 
     const updateControls = async () => {
         const isRunning = state.currentAnimation !== null;
+        const isBusy = isRunning || state.isDragging;
         const hasElementsInQueue = state.operationQueue.length !== 0;
 
         if (runtime) {
@@ -172,7 +185,7 @@ export const createControls = (state) => {
                 }
 
                 const delta = i - currentPosition;
-                if (delta !== 0 && !isRunning) {
+                if (delta !== 0 && !isBusy) {
                     node.href = "#";
                     node.onclick = async () => {
                         if (delta > 0) {
@@ -217,7 +230,7 @@ export const createControls = (state) => {
             ...operationButtons,
             ...extraButtons,
         ].forEach((button) => {
-            button.disabled = isRunning || !runtime;
+            button.disabled = isBusy || !runtime;
         });
         pauseButton.disabled = !isRunning || !hasElementsInQueue || !runtime;
         extraButtons.forEach((button) => {
@@ -229,9 +242,7 @@ export const createControls = (state) => {
         resumeButton.hidden = isRunning || remainingOperations.length === 0;
         pauseButton.hidden = !isRunning && remainingOperations.length > 0;
         solveButton.disabled =
-            isRunning ||
-            !runtime ||
-            (await runtime.isSolved(state.currentCube));
+            isBusy || !runtime || (await runtime.isSolved(state.currentCube));
     };
     updateControls();
 
