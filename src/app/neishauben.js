@@ -1,7 +1,5 @@
 import {
     Mesh,
-    CanvasTexture,
-    SRGBColorSpace,
     MeshBasicMaterial,
     DoubleSide,
     Group,
@@ -29,6 +27,7 @@ import {
 } from "./constants";
 import { createControls } from "./controls";
 import { createDragControls } from "./dragControls";
+import { createLabels } from "./labels";
 
 const getRank = (i, j, k) => {
     return Math.abs(i) + Math.abs(j) + Math.abs(k);
@@ -147,35 +146,12 @@ const createCubicle = () => {
     return new Mesh(geometry, material);
 };
 
-const createFace = (i, j, k, label) => {
-    if (typeof label !== "undefined") {
-        var canvas = document.createElement("canvas");
-        canvas.height = 256;
-        canvas.width = 256;
-
-        var context = canvas.getContext("2d");
-        const size = 75;
-        const text = `${label}`;
-        context.font = size + "pt Arial";
-
-        context.fillStyle = "white";
-        context.fillRect(0, 0, canvas.width, canvas.height);
-
-        context.textAlign = "center";
-        context.textBaseline = "middle";
-        context.fillStyle = "black";
-        context.fillText(text, canvas.width / 2, canvas.height / 2);
-        var texture = new CanvasTexture(canvas);
-        texture.colorSpace = SRGBColorSpace;
-        texture.offset.set(0.5, 0.5);
-    }
-
+const createFace = (i, j, k) => {
     const geometry = createRoundRect(0.88, 0.88, 0.05);
     geometry.center();
 
     const material = new MeshBasicMaterial({
         color: 0x000000,
-        map: texture || null,
         side: DoubleSide,
         transparent: true,
         depthTest: true,
@@ -187,7 +163,7 @@ const createFace = (i, j, k, label) => {
     var face = new Mesh(geometry, material);
 
     // Somewhat arbitrary rotations, but just to ensure that normal is facing outwards
-    // everywhere (so text labels show up nicely)
+    // everywhere (so text labels, which are children of the face, show up nicely)
     if (i !== 0) {
         face.rotateY(i * (Math.PI / 2));
     } else if (j !== 0) {
@@ -215,6 +191,7 @@ const setColors = (allFaces, cubeData) => {
 const createRubiksCube = () => {
     const allFaces = [];
     const allCubicles = [];
+    const centerFaces = [];
 
     const rubiksCube = new Group();
     rubiksCube.matrixAutoUpdate = false;
@@ -230,15 +207,10 @@ const createRubiksCube = () => {
                 switch (getRank(i, j, k)) {
                     case 0: // center of the cube
                         continue;
-                    case 1: {
-                        // center of the face
-                        const label = planePermutations.find(
-                            ({ center: [a, b, c] }) =>
-                                a == i && b == j && c == k
-                        ).name;
-                        faces.push(createFace(i, j, k, label));
+                    case 1: // center of the face
+                        faces.push(createFace(i, j, k));
+                        centerFaces.push(faces[0]);
                         break;
-                    }
                     case 2: // edge
                         if (i == 0) {
                             faces.push(createFace(i, j, 0));
@@ -272,7 +244,7 @@ const createRubiksCube = () => {
         }
     }
 
-    return [rubiksCube, allCubicles, allFaces];
+    return [rubiksCube, allCubicles, allFaces, centerFaces];
 };
 
 export const initializeNeishauben = async () => {
@@ -294,8 +266,9 @@ export const initializeNeishauben = async () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    const [rubiksCube, allCubicles, allFaces] = createRubiksCube();
+    const [rubiksCube, allCubicles, allFaces, centerFaces] = createRubiksCube();
     scene.add(rubiksCube);
+    const labels = createLabels(centerFaces);
 
     var isRendering = false;
     var renderFunc;
@@ -357,12 +330,19 @@ export const initializeNeishauben = async () => {
     controls.update();
 
     renderFunc = async () => {
+        const now = performance.now();
         if (state.currentAnimation !== null) {
             if (state.currentAnimation.finished()) {
                 // A drag that snapped back to its starting position has no
                 // operation to apply to the cube state.
                 const { operation } = state.currentAnimation;
+                // The labels ease from what the last frame showed into
+                // their resting state, concurrently with whatever comes
+                // next (see labels.js).
+                labels.capture();
                 state.currentAnimation.reset();
+                rubiksCube.updateMatrixWorld(true);
+                labels.begin(now);
                 if (operation) {
                     const [runtime] = await runtimePromise;
                     state.setColors(
@@ -384,7 +364,13 @@ export const initializeNeishauben = async () => {
                 state.animationSpeed
             );
             state.notifyChange();
-        } else {
+        }
+        const labelsSettling = labels.step(now);
+        if (
+            state.currentAnimation === null &&
+            state.operationQueue.length === 0 &&
+            !labelsSettling
+        ) {
             isRendering = false;
             state.notifyChange();
         }
